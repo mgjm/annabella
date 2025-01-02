@@ -5,6 +5,7 @@
 #include "scope.h"
 #include <fcntl.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <unistd.h>
 
 void file_buffer_open(file_buffer_t *self, const char *path) {
@@ -190,11 +191,38 @@ void token_stream_whitespace(token_stream_t *self) {
   }
 }
 
+char *token_to_string(token_t token) {
+  char *str;
+  switch (token.type) {
+  case token_type_end:
+    return "end token";
+  case token_type_whitespace:
+    return "whitespace";
+  case token_type_token:
+    asprintf(&str, "token '%c'", token.token);
+    break;
+  case token_type_ident:
+    asprintf(&str, "ident `%s`", atom_get(token.ident));
+    break;
+  case token_type_number:
+    asprintf(&str, "number %s", atom_get(token.ident));
+    break;
+  case token_type_string:
+    asprintf(&str, "string \"%s\"", atom_get(token.ident));
+    break;
+  }
+  return str;
+}
+
+#define die_with_token(token, msg, ...)                                        \
+  die("unexpected %s (expected " msg ")\n",                                    \
+      token_to_string(token) __VA_OPT__(, __VA_ARGS__))
+
 atom_t token_stream_ident(token_stream_t *self) {
   token_stream_whitespace(self);
   token_t token = token_stream_next(self);
   if (token.type != token_type_ident) {
-    die("unexpected token type: %d\n", token.type);
+    die_with_token(token, "ident");
   }
   return token.ident;
 }
@@ -211,14 +239,9 @@ path_t token_stream_path(token_stream_t *self) {
 
   path_t path = {};
   while (true) {
+    path_push(&path, token_stream_ident(self));
+
     token_t token = token_stream_next(self);
-
-    if (token.type != token_type_ident) {
-      die("unexpected token type: %d\n", token.type);
-    }
-    path_push(&path, token.ident);
-
-    token = token_stream_next(self);
     if (token.type != token_type_token || token.token != '.') {
       token_stream_unshift(self, token);
       break;
@@ -229,11 +252,8 @@ path_t token_stream_path(token_stream_t *self) {
 
 void token_stream_semi(token_stream_t *self) {
   token_t token = token_stream_next(self);
-  if (token.type != token_type_token) {
-    die("unexpected token type: %d\n", token.type);
-  }
-  if (token.token != ';') {
-    die("unexpected token value: %c != ;\n", token.token);
+  if (token.type != token_type_token || token.token != ';') {
+    die_with_token(token, "semicolon");
   }
 }
 
@@ -276,15 +296,20 @@ expr_t *token_stream_expr(token_stream_t *self) {
   switch (token.type) {
   case token_type_string:
     return (expr_t *)string_expr_new(token.string);
+  case token_type_ident: {
+    token_stream_unshift(self, token);
+    path_t path = token_stream_path(self);
+    return (expr_t *)path_expr_new(path);
+  }
   default:
-    die("unexpected token type: %d\n", token.type);
+    die_with_token(token, "start of expression");
   }
 }
 
 array_t token_stream_brackets(token_stream_t *self) {
   token_t start = token_stream_next(self);
   if (start.type != token_type_token) {
-    die("unexpected token type: %d\n", start.type);
+    die_with_token(start, "open bracket");
   }
   char end_token;
   switch (start.token) {
@@ -295,12 +320,11 @@ array_t token_stream_brackets(token_stream_t *self) {
     end_token = ']';
     break;
   default:
-    die("unexpected token value: %c != ( or [\n", start.token);
+    die_with_token(start, "open bracket");
   }
 
   array_t values = {};
   while (true) {
-    // token != ) or ]
     token_t end = token_stream_next(self);
     if (end.type == token_type_token && end.token == end_token) {
       break;
@@ -328,7 +352,7 @@ stmt_t *token_stream_statement(token_stream_t *self) {
     return NULL;
   }
   if (token.type != token_type_ident) {
-    die("unexpected token type: %d\n", token.type);
+    die_with_token(token, "start of statement");
   }
 
   switch (token.ident.id) {

@@ -72,3 +72,10 @@ typedef struct string_expr {
 } string_expr_t;
 
 extern string_expr_t *string_expr_new(atom_t value);
+
+typedef struct path_expr {
+  ast_node_vtable_t *vtable;
+  path_t path;
+} path_expr_t;
+
+extern path_expr_t *path_expr_new(path_t path);

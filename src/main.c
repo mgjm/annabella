@@ -8,6 +8,7 @@ int main(int argc, const char *const argv[]) {
   }
 
   printf("Hello World from C\n");
+
   tokenize_file(argv[1]);
 
   return EXIT_SUCCESS;

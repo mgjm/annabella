@@ -3,7 +3,7 @@
 #include "macros.h"
 #include "object.h"
 #include "scope.h"
-#include "std-ada-text-io.h"
+#include "std.h"
 #include "value.h"
 #include <stdlib.h>
 
@@ -49,17 +49,23 @@ static void with_stmt_drop(void *_self) {
 
 static value_t *with_stmt_eval(void *_self, scope_t *scope) {
   with_stmt_t *self = _self;
-  // TODO: implement actual import logic
 
-  packet_value_t *ada = packet_value_new();
-  scope_insert(scope, atom_new("Ada"), (value_t *)ada);
+  init_global_scope();
+  value_t *value = scope_try_get(&global_scope, self->path.components[0]);
+  if (value != NULL) {
+    scope_insert(scope, self->path.components[0], value);
+  } else {
+    // TODO: import from file
+    if (atom_eq(self->path.components[0], atom_new("Test"))) {
+      packet_value_t *test = packet_value_new();
+      scope_insert(scope, atom_new("Test"), (value_t *)test);
 
-  packet_value_t *text_io = packet_value_new();
-  scope_insert(&ada->scope, atom_new("Text_IO"), (value_t *)text_io);
-
-  c_function_value_t *put_line =
-      c_function_value_new(ada_text_io_put_line, NULL);
-  scope_insert(&text_io->scope, atom_new("Put_Line"), (value_t *)put_line);
+      string_value_t *get_lang = string_value_from_ref("Hello from Ada via C");
+      scope_insert(&test->scope, atom_new("GetLang"), (value_t *)get_lang);
+    } else {
+      die("file import not implemented");
+    }
+  }
 
   return NULL;
 }
@@ -176,6 +182,37 @@ string_expr_t *string_expr_new(atom_t value) {
   *self = (string_expr_t){
       &string_expr_vtable,
       value,
+  };
+  return self;
+}
+
+static void path_expr_drop(void *_self) {
+  path_expr_t *self = _self;
+  path_drop(&self->path);
+  free(self);
+}
+
+static value_t *path_expr_eval(void *_self, scope_t *scope) {
+  path_expr_t *self = _self;
+
+  value_t *value = scope_get(scope, self->path.components[0]);
+  for (size_t i = 1; i < self->path.len; i++) {
+    value = value_get_by_key(value, self->path.components[i]);
+  }
+  return value;
+}
+
+static ast_node_vtable_t path_expr_vtable = {
+    "path_expr",
+    path_expr_drop,
+    path_expr_eval,
+};
+
+path_expr_t *path_expr_new(path_t path) {
+  path_expr_t *self = malloc(sizeof(path_expr_t));
+  *self = (path_expr_t){
+      &path_expr_vtable,
+      path,
   };
   return self;
 }

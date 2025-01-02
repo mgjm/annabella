@@ -19,6 +19,7 @@ typedef struct scope {
 
 extern void scope_insert(scope_t *self, atom_t key, value_t *value);
 
+extern value_t *scope_try_get(scope_t *self, atom_t key);
 extern value_t *scope_get(scope_t *self, atom_t key);
 
 extern void scope_drop(scope_t *self);

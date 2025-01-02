@@ -78,4 +78,8 @@ callback(use, "use") \
 callback(when, "when") \
 callback(while, "while") \
 callback(with, "with") \
-callback(xor, "xor")
+callback(xor, "xor") \
+/* ada std lib */ \
+callback(ada, "Ada") \
+callback(text_io, "Text_IO") \
+callback(put_line, "Put_Line")
