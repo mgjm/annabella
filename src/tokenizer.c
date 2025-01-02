@@ -1,4 +1,5 @@
 #include "tokenizer.h"
+#include "ast.h"
 #include "atom.h"
 #include "macros.h"
 #include <fcntl.h>
@@ -205,16 +206,17 @@ void token_stream_consume_ident(token_stream_t *self, atom_t expected) {
   }
 }
 
-void token_stream_path(token_stream_t *self) {
+path_t token_stream_path(token_stream_t *self) {
   token_stream_whitespace(self);
 
+  path_t path = {};
   while (true) {
     token_t token = token_stream_next(self);
 
     if (token.type != token_type_ident) {
       die("unexpected token type: %d\n", token.type);
     }
-    eprintf("path component: %s\n", atom_get(token.ident));
+    path_push(&path, token.ident);
 
     token = token_stream_next(self);
     if (token.type != token_type_token || token.token != '.') {
@@ -222,6 +224,7 @@ void token_stream_path(token_stream_t *self) {
       break;
     }
   }
+  return path;
 }
 
 void token_stream_semi(token_stream_t *self) {
@@ -234,21 +237,19 @@ void token_stream_semi(token_stream_t *self) {
   }
 }
 
-void token_stream_with_statement(token_stream_t *self) {
-  eprintf("with statement:\n");
-  token_stream_path(self);
+stmt_t *token_stream_with_statement(token_stream_t *self) {
+  path_t path = token_stream_path(self);
   token_stream_semi(self);
-  eprintf("\n");
+  return (stmt_t *)with_stmt_new(path);
 }
 
-bool token_stream_statement(token_stream_t *self);
+stmt_t *token_stream_statement(token_stream_t *self);
 
-void token_stream_procedure_statement(token_stream_t *self) {
-  eprintf("procedure statement:\n");
+stmt_t *token_stream_procedure_statement(token_stream_t *self) {
   atom_t ident = token_stream_ident(self);
-  eprintf("procedure %s\n", atom_get(ident));
   token_stream_consume_ident(self, atom_is);
   token_stream_consume_ident(self, atom_begin);
+  array_t body = {};
   while (true) {
     token_stream_whitespace(self);
     token_t token = token_stream_next(self);
@@ -259,25 +260,28 @@ void token_stream_procedure_statement(token_stream_t *self) {
       break;
     }
     token_stream_unshift(self, token);
-    token_stream_statement(self);
+    stmt_t *stmt = token_stream_statement(self);
+    if (stmt == NULL) {
+      die("unterminated precedure: %s\n", atom_get(ident));
+    }
+    array_push(&body, stmt);
   }
   token_stream_consume_ident(self, ident);
   token_stream_semi(self);
-  eprintf("\n");
+  return (stmt_t *)procedure_stmt_new(ident, body);
 }
 
-void token_stream_expr(token_stream_t *self) {
+expr_t *token_stream_expr(token_stream_t *self) {
   token_t token = token_stream_next(self);
   switch (token.type) {
   case token_type_string:
-    eprintf("string literal: %s\n", atom_get(token.string));
-    break;
+    return (expr_t *)string_expr_new(token.string);
   default:
     die("unexpected token type: %d\n", token.type);
   }
 }
 
-void token_stream_brackets(token_stream_t *self) {
+array_t token_stream_brackets(token_stream_t *self) {
   token_t start = token_stream_next(self);
   if (start.type != token_type_token) {
     die("unexpected token type: %d\n", start.type);
@@ -294,7 +298,7 @@ void token_stream_brackets(token_stream_t *self) {
     die("unexpected token value: %c != ( or [\n", start.token);
   }
 
-  eprintf("start of brackets: %c\n", start.token);
+  array_t values = {};
   while (true) {
     // token != ) or ]
     token_t end = token_stream_next(self);
@@ -303,23 +307,25 @@ void token_stream_brackets(token_stream_t *self) {
     }
 
     token_stream_unshift(self, end);
-    token_stream_expr(self);
+    expr_t *expr = token_stream_expr(self);
+    array_push(&values, expr);
   }
-  eprintf("end of brackets: %c\n", end_token);
+  return values;
 }
 
-void token_stream_non_keyword_statement(token_stream_t *self) {
-  token_stream_path(self);
-  token_stream_brackets(self);
+stmt_t *token_stream_non_keyword_statement(token_stream_t *self) {
+  path_t path = token_stream_path(self);
+  array_t args = token_stream_brackets(self);
   token_stream_semi(self);
+  return (stmt_t *)function_call_expr_new(path, args);
 }
 
-bool token_stream_statement(token_stream_t *self) {
+stmt_t *token_stream_statement(token_stream_t *self) {
   token_stream_whitespace(self);
 
   token_t token = token_stream_next(self);
   if (token.type == token_type_end) {
-    return false;
+    return NULL;
   }
   if (token.type != token_type_ident) {
     die("unexpected token type: %d\n", token.type);
@@ -327,33 +333,39 @@ bool token_stream_statement(token_stream_t *self) {
 
   switch (token.ident.id) {
   case static_atom_with:
-    token_stream_with_statement(self);
-    break;
+    return token_stream_with_statement(self);
   case static_atom_procedure:
-    token_stream_procedure_statement(self);
-    break;
+    return token_stream_procedure_statement(self);
   default:
     if (atom_is_keyword(token.ident)) {
       die("unknown keyword statement: %s\n", atom_get(token.ident));
     }
     token_stream_unshift(self, token);
-    token_stream_non_keyword_statement(self);
-    break;
+    return token_stream_non_keyword_statement(self);
   }
-  return true;
 }
 
 void tokenize_file(const char *path) {
   token_stream_t token_stream = {};
   file_buffer_open(&token_stream.file_buffer, path);
 
-  eprintf("\n\n");
-  while (token_stream_statement(&token_stream)) {
+  array_t stmts = {};
+  while (true) {
+    stmt_t *stmt = token_stream_statement(&token_stream);
+    if (stmt == NULL) {
+      break;
+    }
+    array_push(&stmts, stmt);
   }
-  eprintf("\n\n");
   eprintf("end of file\n");
   close(token_stream.file_buffer.fd);
 
+  eprintf("\n\n");
+
+  for (size_t i = 0; i < stmts.len; i++) {
+    ast_node_eval(stmts.data[i]);
+  }
+  eprintf("\n\n");
   // while (true) {
   //   token_t token = token_stream_next(&token_stream);
   //   switch (token.type) {
