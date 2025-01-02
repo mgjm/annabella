@@ -10,68 +10,22 @@
 // class Expr extends AstNode:
 // class FnCallExpr extends Expr:
 // class StringExpr extends Expr:
-//
-// class Value:
-//   drop()
-//   call(args) -> Value
-//   callUnaryOperator(op) -> Value // -5
-//   callBinaryOperator(op, rhs) -> Value // 2 + 3
-//   callMethod(name, args) -> Value
-//   getField(name) -> Value
-//   setField(name, value)
-//
-// StringValue:
-// AtomStringValue:      // maybe?
-// AllocatedStringValue: // maybe?
-// IntValue:
-// FloatValue:
-// FunctionValue: // function definition
-// ClassValue: // class definition
-// ObjectValue: // instance of a class
 
 #include "atom.h"
-#include <stddef.h>
-
-typedef struct object_vtable {
-  const char *class_name;
-  void (*drop)(void *self);
-} object_vtable_t;
-
-typedef struct object {
-  object_vtable_t *vtable;
-} object_t;
-
-static inline const char *object_class_name(object_t *self) {
-  return self->vtable->class_name;
-}
-
-static inline void object_drop(object_t *self) { self->vtable->drop(self); }
-
-typedef struct array {
-  object_t **data;
-  size_t len;
-  size_t cap;
-} array_t;
-
-// item needs to be an instance of object_t
-extern void array_push(array_t *self, void *item);
-
-extern void array_drop(array_t *self);
-
-static inline object_t *array_as_object(array_t *self) {
-  return (object_t *)self;
-};
+#include "object.h"
+#include "scope.h"
+#include "value.h"
 
 typedef struct ast_node_vtable {
   object_vtable_t object;
-  void (*eval)(void *self);
+  value_t *(*eval)(void *self, scope_t *scope);
 } ast_node_vtable_t;
 
 typedef struct ast_node {
   ast_node_vtable_t *vtable;
 } ast_node_t;
 
-extern void ast_node_eval(void *self);
+extern value_t *ast_node_eval(void *self, scope_t *scope);
 
 typedef ast_node_t stmt_t;
 

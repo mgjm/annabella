@@ -2,6 +2,7 @@
 #include "ast.h"
 #include "atom.h"
 #include "macros.h"
+#include "scope.h"
 #include <fcntl.h>
 #include <stdbool.h>
 #include <unistd.h>
@@ -179,7 +180,6 @@ token_t token_stream_next(token_stream_t *self) {
 }
 
 void token_stream_whitespace(token_stream_t *self) {
-
   while (true) {
     token_t token = token_stream_next(self);
 
@@ -360,10 +360,11 @@ void tokenize_file(const char *path) {
   eprintf("end of file\n");
   close(token_stream.file_buffer.fd);
 
-  eprintf("\n\n");
+  scope_t global_scope = {};
 
+  eprintf("\n\n");
   for (size_t i = 0; i < stmts.len; i++) {
-    ast_node_eval(stmts.data[i]);
+    ast_node_eval(stmts.data[i], &global_scope);
   }
   eprintf("\n\n");
   // while (true) {

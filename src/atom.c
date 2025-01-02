@@ -45,4 +45,9 @@ atom_t atom_new(const char *str) {
   return atom;
 }
 
-const char *atom_get(atom_t self) { return entries[self.id]; }
+const char *atom_get(atom_t self) {
+  if (self.id >= len) {
+    die("unknwon atom id: %ld\n", self.id);
+  }
+  return entries[self.id];
+}

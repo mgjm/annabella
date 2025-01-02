@@ -1,32 +1,11 @@
 #include "ast.h"
 #include "atom.h"
 #include "macros.h"
+#include "object.h"
+#include "scope.h"
+#include "std-ada-text-io.h"
+#include "value.h"
 #include <stdlib.h>
-
-void array_push(array_t *self, void *item) {
-  if (self->len == self->cap) {
-    size_t new_cap = self->cap > 0 ? self->cap * 2 : 1;
-    self->data = realloc(self->data, new_cap * sizeof(*self->data));
-    if (self->data == NULL) {
-      die_errno("failed to reallocate array: %s\n");
-    }
-    self->cap = new_cap;
-  }
-
-  if (self->len >= self->cap) {
-    die("array push out of bounds: %ld >= %ld\n", self->len, self->cap);
-  }
-
-  self->data[self->len++] = item;
-}
-
-void array_drop(array_t *self) {
-  for (size_t i = 0; i < self->len; i++) {
-    object_drop(self->data[i]);
-  }
-  free(self->data);
-  *self = (array_t){};
-}
 
 void path_print(path_t *self) {
   for (size_t i = 0; i < self->len; i++) {
@@ -57,9 +36,9 @@ void path_drop(path_t *self) {
   *self = (path_t){};
 }
 
-void ast_node_eval(void *_self) {
+value_t *ast_node_eval(void *_self, scope_t *scope) {
   ast_node_t *self = _self;
-  self->vtable->eval(self);
+  return self->vtable->eval(self, scope);
 }
 
 static void with_stmt_drop(void *_self) {
@@ -68,11 +47,21 @@ static void with_stmt_drop(void *_self) {
   free(self);
 }
 
-static void with_stmt_eval(void *_self) {
+static value_t *with_stmt_eval(void *_self, scope_t *scope) {
   with_stmt_t *self = _self;
-  eprintf("with statement: ");
-  path_print(&self->path);
-  eprintf("\n");
+  // TODO: implement actual import logic
+
+  packet_value_t *ada = packet_value_new();
+  scope_insert(scope, atom_new("Ada"), (value_t *)ada);
+
+  packet_value_t *text_io = packet_value_new();
+  scope_insert(&ada->scope, atom_new("Text_IO"), (value_t *)text_io);
+
+  c_function_value_t *put_line =
+      c_function_value_new(ada_text_io_put_line, NULL);
+  scope_insert(&text_io->scope, atom_new("Put_Line"), (value_t *)put_line);
+
+  return NULL;
 }
 
 static ast_node_vtable_t with_stmt_vtable = {
@@ -96,13 +85,14 @@ static void procedure_stmt_drop(void *_self) {
   free(self);
 }
 
-static void procedure_stmt_eval(void *_self) {
+static value_t *procedure_stmt_eval(void *_self, scope_t *scope) {
   procedure_stmt_t *self = _self;
   eprintf("procedure statement %s:\n", atom_get(self->ident));
   for (size_t i = 0; i < self->body.len; i++) {
-    ast_node_eval(self->body.data[i]);
+    ast_node_eval(self->body.data[i], scope);
   }
   eprintf("end of procedure %s\n", atom_get(self->ident));
+  return NULL;
 }
 
 static ast_node_vtable_t procedure_stmt_vtable = {
@@ -128,15 +118,25 @@ static void function_call_expr_drop(void *_self) {
   free(self);
 }
 
-static void function_call_expr_eval(void *_self) {
+static value_t *function_call_expr_eval(void *_self, scope_t *scope) {
   function_call_expr_t *self = _self;
-  eprintf("call: ");
-  path_print(&self->path);
-  eprintf("(\n");
-  for (size_t i = 0; i < self->args.len; i++) {
-    ast_node_eval(self->args.data[i]);
+
+  // fetch function value
+  value_t *value = scope_get(scope, self->path.components[0]);
+  for (size_t i = 1; i < self->path.len; i++) {
+    value = value_get_by_key(value, self->path.components[i]);
   }
-  eprintf(")\n");
+
+  // collect arguments
+  array_t args = {};
+  for (size_t i = 0; i < self->args.len; i++) {
+    value_t *arg = ast_node_eval(self->args.data[i], scope);
+    eprintf("push arg: %lx\n", (size_t)arg);
+    array_push(&args, arg);
+  }
+
+  // call function
+  return value_call(value, &args);
 }
 
 static ast_node_vtable_t function_call_expr_vtable = {
@@ -160,9 +160,9 @@ static void string_expr_drop(void *_self) {
   free(self);
 }
 
-static void string_expr_eval(void *_self) {
+static value_t *string_expr_eval(void *_self, scope_t *scope) {
   string_expr_t *self = _self;
-  eprintf("string expr: %s\n", atom_get(self->value));
+  return (value_t *)string_value_from_atom(self->value);
 }
 
 static ast_node_vtable_t string_expr_vtable = {
