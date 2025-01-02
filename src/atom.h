@@ -15,6 +15,14 @@ enum _static_atom { _STATIC_ATOMS(_STATIC_ATOM_ENUM) };
   static const atom_t atom_##name = {static_atom_##name};
 _STATIC_ATOMS(_STATIC_ATOM_CONST)
 
+#define _STATIC_ATOM_(ident) static_atom_##ident
+#define STATIC_ATOM_(ident) _STATIC_ATOM_(ident)
+
+static inline bool atom_is_keyword(atom_t self) {
+  return STATIC_ATOM_(KEYWORD_FIRST) <= self.id &&
+         self.id <= STATIC_ATOM_(KEYWORD_LAST);
+}
+
 extern atom_t atom_new(const char *str);
 
 extern const char *atom_get(atom_t self);

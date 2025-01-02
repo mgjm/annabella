@@ -22,7 +22,12 @@ typedef enum token_type {
 
 typedef struct token {
   token_type_t type;
-  atom_t value;
+  union {
+    char token;
+    atom_t ident;
+    atom_t number;
+    atom_t string;
+  };
 } token_t;
 
 typedef struct token_stream {
