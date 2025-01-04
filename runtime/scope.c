@@ -1,9 +1,10 @@
-
 #include "scope.h"
 #include "atom.h"
 #include "macros.h"
-#include "object.h"
+#include "private.h"
+#include "value.h"
 #include <stdlib.h>
+#include <string.h>
 
 void scope_insert(scope_t *self, atom_t key, value_t *value) {
   for (size_t i = 0; i < self->len; i++) {
@@ -26,6 +27,44 @@ void scope_insert(scope_t *self, atom_t key, value_t *value) {
   }
 
   self->data[self->len++] = (scope_entry_t){key, value};
+}
+
+static value_t *scope_or_value_get_or_insert_package(scope_t *self,
+                                                     value_t *value,
+                                                     atom_t key) {
+  if (value == NULL) {
+    value = scope_try_get(self, key);
+    if (value == NULL) {
+      value = package_value_new();
+      scope_insert(self, key, value);
+    }
+    return value;
+  } else {
+    return package_value_get_package(value, key);
+  }
+}
+
+void annabella_scope_insert_package(scope_t *self, package_t *package) {
+  char buffer[128];
+  const char *start = package->name;
+  const char *end;
+
+  value_t *value = NULL;
+
+  while ((end = strchr(start, '.'))) {
+    size_t len = end - start;
+    if (len >= array_len(buffer)) {
+      die("package path component too long: %s\n", package->name);
+    }
+    strncpy(buffer, start, len);
+    buffer[len] = '\0';
+    start += len + 1;
+
+    value = scope_or_value_get_or_insert_package(self, value, atom_new(buffer));
+  }
+  value = scope_or_value_get_or_insert_package(self, value, atom_new(start));
+
+  package_value_set_package(value, package);
 }
 
 value_t *scope_try_get(scope_t *self, atom_t key) {
@@ -52,9 +91,13 @@ value_t *scope_get(scope_t *self, atom_t key) {
   return value;
 }
 
-void scope_drop(scope_t *self) {
+value_t *annabella_scope_get(scope_t *self, const char *key) {
+  return scope_get(self, atom_new(key));
+}
+
+void annabella_scope_drop(scope_t *self) {
   for (size_t i = 0; i < self->len; i++) {
-    object_drop((object_t *)self->data[i].value);
+    annabella_value_drop(self->data[i].value);
   }
   free(self->data);
   *self = (scope_t){};

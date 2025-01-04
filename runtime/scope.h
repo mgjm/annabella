@@ -1,21 +1,12 @@
 #pragma once
 
 #include "atom.h"
+#include "private.h"
 
-typedef struct value value_t;
-typedef struct scope scope_t;
-
-typedef struct scope_entry {
+typedef struct annabella_scope_entry {
   atom_t key;
   value_t *value;
-} scope_entry_t;
-
-typedef struct scope {
-  scope_t *parent;
-  scope_entry_t *data;
-  size_t len;
-  size_t cap;
-} scope_t;
+} annabella_scope_entry_t;
 
 extern void scope_insert(scope_t *self, atom_t key, value_t *value);
 

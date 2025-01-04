@@ -1,13 +1,11 @@
 #include "atom.h"
 #include "macros.h"
-#include "static-atom.h"
 #include <stdlib.h>
 #include <string.h>
 
 // TODO: add hashmap to speed up atom lookup
 
-#define _STATIC_ATOM_ENTRY(name, value) [static_atom_##name] = value,
-static const char *const start_entries[] = {_STATIC_ATOMS(_STATIC_ATOM_ENTRY)};
+static const char *const start_entries[] = {""};
 
 static const char **entries = NULL;
 static size_t len = array_len(start_entries);

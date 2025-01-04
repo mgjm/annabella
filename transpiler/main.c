@@ -1,4 +1,5 @@
 #include "macros.h"
+#include "statement.h"
 #include "tokenizer.h"
 #include <stdio.h>
 
@@ -9,7 +10,10 @@ int main(int argc, const char *const argv[]) {
 
   printf("Hello World from C\n");
 
-  tokenize_file(argv[1]);
+  token_stream_t token_stream = token_stream_open(argv[1]);
+
+  while (token_stream_statement(&token_stream)) {
+  }
 
   return EXIT_SUCCESS;
 }

@@ -1,0 +1,38 @@
+#include "ast-node.h"
+#include "macros.h"
+#include "token-stream.h"
+
+typedef struct ast_path {
+  ast_node_t super;
+} ast_path_t;
+
+static void ast_path_drop(void *_self) {
+  ast_path_t *self = _self;
+  free(self);
+}
+
+static void ast_path_to_string(void *_self, string_t *str) {
+  ast_path_t *self = _self;
+  string_append(str, "path");
+}
+
+static void ast_path_generate(void *_self, context_t *ctx) {
+  die("generate not implemented: %s\n", ast_node_class_name(_self));
+}
+
+static const ast_node_vtable_t ast_path_vtable = {
+    "path",
+    ast_path_drop,
+    ast_path_to_string,
+    ast_path_generate,
+};
+
+ast_node_t *token_stream_path(token_stream_t *self) {
+  die("token stream path not implemented\n");
+
+  ast_path_t *path = malloc(sizeof(*path));
+  *path = (ast_path_t){
+      &ast_path_vtable,
+  };
+  return &path->super;
+}

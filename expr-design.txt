@@ -1,0 +1,11 @@
+foo() + -2 * 3 + 4
+
+                       < _value_expr
+                       < _suffix_expr
+--A--   -A             < _prefix_expr
+------A---   --A--     < _add_expr
+-----------A------     < _mult_expr
+                       < _expr
+
+
+

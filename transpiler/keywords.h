@@ -1,10 +1,7 @@
 #pragma once
 
-#define KEYWORD_FIRST abort
-#define KEYWORD_LAST xor
-
-#define _STATIC_ATOMS(callback) callback(empty, "") /**/ \
-/* keywords */ \
+#define _KEYWORDS(callback)                                                    \
+  /* keywords */                                                               \
 callback(abort, "abort") \
 callback(abs, "abs") \
 callback(abstract, "abstract") /* Ada 95 */ \
@@ -78,8 +75,10 @@ callback(use, "use") \
 callback(when, "when") \
 callback(while, "while") \
 callback(with, "with") \
-callback(xor, "xor") \
-/* ada std lib */ \
-callback(ada, "Ada") \
-callback(text_io, "Text_IO") \
-callback(put_line, "Put_Line")
+callback(xor, "xor")
+
+#define _KEYWORDS_ENUM(name, value) keyword_##name,
+typedef enum keyword { _not_a_keyword, _KEYWORDS(_KEYWORDS_ENUM) } keyword_t;
+
+extern keyword_t keyword_new(const char *str);
+extern const char *keyword_get(keyword_t self);
