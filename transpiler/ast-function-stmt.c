@@ -1,5 +1,4 @@
 #include "ast-node.h"
-#include "macros.h"
 #include "str.h"
 #include "token-stream.h"
 
@@ -39,7 +38,30 @@ static void ast_function_stmt_to_string(void *_self, string_t *str) {
 }
 
 static void ast_function_stmt_generate(void *_self, context_t *ctx) {
-  die("generate not implemented: %s\n", ast_node_class_name(_self));
+  ast_function_stmt_t *self = _self;
+
+  string_append(
+      &ctx->functions,
+      "static annabella_value_t *__%s(annabella_scope_t *parent_scope) {\n"
+      "annabella_scope_t function_scope = {parent_scope};\n"
+      "annabella_scope_t *scope = &function_scope;\n"
+      "annabella_value_t *return_value = 0;\n"
+      "\n",
+      self->name);
+  ast_node_array_generate(&self->body, ctx);
+  string_append(&ctx->functions, "%s", ctx->value);
+  free(ctx->value);
+  ctx->value = NULL;
+  string_append(&ctx->functions, "\n"
+                                 "return_stmt:\n"
+                                 "annabella_scope_drop(scope);\n"
+                                 "return return_value;\n"
+                                 "}\n"
+                                 "\n");
+
+  string_append(&ctx->init,
+                "annabella_scope_insert_function(scope, \"%s\", __%s);\n\n",
+                self->name, self->name);
 }
 
 static const ast_node_vtable_t ast_function_stmt_vtable = {

@@ -1,5 +1,5 @@
 #include "ast-node.h"
-#include "macros.h"
+#include "str.h"
 #include "token-stream.h"
 
 typedef struct ast_with_stmt {
@@ -21,7 +21,17 @@ static void ast_with_stmt_to_string(void *_self, string_t *str) {
 }
 
 static void ast_with_stmt_generate(void *_self, context_t *ctx) {
-  die("generate not implemented: %s\n", ast_node_class_name(_self));
+  ast_with_stmt_t *self = _self;
+
+  string_append(&ctx->init,
+                "annabella_scope_insert_package(scope, _annabella_package_");
+  ast_path_generate_init_fn_name(self->path, &ctx->init);
+  string_append(&ctx->init, "_init());\n\n");
+
+  string_append(&ctx->functions,
+                "extern annabella_package_t *_annabella_package_");
+  ast_path_generate_init_fn_name(self->path, &ctx->functions);
+  string_append(&ctx->functions, "_init();\n\n");
 }
 
 static const ast_node_vtable_t ast_with_stmt_vtable = {

@@ -1,5 +1,5 @@
 #include "ast-node.h"
-#include "macros.h"
+#include "str.h"
 #include "token-stream.h"
 
 typedef struct ast_package_stmt {
@@ -27,7 +27,44 @@ static void ast_package_stmt_to_string(void *_self, string_t *str) {
 }
 
 static void ast_package_stmt_generate(void *_self, context_t *ctx) {
-  die("generate not implemented: %s\n", ast_node_class_name(_self));
+  ast_package_stmt_t *self = _self;
+
+  ast_node_array_generate(&self->stmts, ctx);
+
+  string_append(&ctx->functions, "annabella_package_t *_annabella_package_");
+  ast_path_generate_init_fn_name(self->name, &ctx->functions);
+  string_append(&ctx->functions, "_init() {\n\n"
+                                 "static annabella_package_t package = {\n"
+                                 "\"");
+
+  ast_node_to_string(self->name, &ctx->functions);
+
+  string_append(&ctx->functions,
+                "\",\n"
+                "};\n"
+                "annabella_scope_t *scope = &package.scope;\n"
+                "\n"
+                "switch (package.state) {\n"
+                "case annabella_package_state_uninitalized:\n"
+                "break;\n"
+                "case annabella_package_state_initializing:\n"
+                "return annabella_package_already_initializing(package.name);\n"
+                "case annabella_package_state_initialized:\n"
+                "return &package;\n"
+                "}\n"
+                "\n"
+                "package.state = annabella_package_state_initializing;\n"
+                "\n"
+                "\n"
+                "%s"
+                "\n"
+                "package.state = annabella_package_state_initialized;\n"
+                "return &package;\n"
+                "}\n",
+                ctx->init);
+
+  free(ctx->init);
+  ctx->init = NULL;
 }
 
 static const ast_node_vtable_t ast_package_stmt_vtable = {

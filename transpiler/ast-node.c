@@ -42,3 +42,18 @@ void ast_node_array_to_string_comma(ast_node_array_t *self, string_t *str) {
     ast_node_to_string(self->nodes[i], str);
   }
 }
+
+void ast_node_array_generate(ast_node_array_t *self, context_t *ctx) {
+  for (size_t i = 0; i < self->len; i++) {
+    ast_node_generate(self->nodes[i], ctx);
+  }
+}
+
+void ast_node_array_generate_comma(ast_node_array_t *self, context_t *ctx) {
+  for (size_t i = 0; i < self->len; i++) {
+    if (i != 0) {
+      string_append(&ctx->value, ", ");
+    }
+    ast_node_generate(self->nodes[i], ctx);
+  }
+}

@@ -13,12 +13,30 @@ int main(int argc, const char *const argv[]) {
 
   token_stream_t token_stream = token_stream_open(argv[1]);
 
-  ast_node_t *stmt;
+  ast_node_array_t stmts = {};
+
   while (!token_stream_is_end(&token_stream)) {
     ast_node_t *stmt = token_stream_stmt(&token_stream);
-    eprintf("\n");
-    ast_node_debug(stmt);
+    ast_node_array_push(&stmts, stmt);
+    // eprintf("\n");
+    // ast_node_debug(stmt);
   }
+
+  // {
+  //   string_t str = NULL;
+  //   ast_node_array_to_string_lines(&stmts, &str);
+  //   eprintf("%s", str);
+  //   free(str);
+  // }
+
+  context_t ctx = {};
+  for (size_t i = 0; i < stmts.len; i++) {
+    ast_node_generate(stmts.nodes[i], &ctx);
+    if (i == 42) {
+      break;
+    }
+  }
+  context_finalize(&ctx);
 
   return EXIT_SUCCESS;
 }

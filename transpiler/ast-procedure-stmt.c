@@ -1,5 +1,4 @@
 #include "ast-node.h"
-#include "macros.h"
 #include "str.h"
 #include "token-stream.h"
 
@@ -28,7 +27,28 @@ static void ast_procedure_stmt_to_string(void *_self, string_t *str) {
 }
 
 static void ast_procedure_stmt_generate(void *_self, context_t *ctx) {
-  die("generate not implemented: %s\n", ast_node_class_name(_self));
+  ast_procedure_stmt_t *self = _self;
+
+  string_append(
+      &ctx->functions,
+      "static annabella_value_t *__%s(annabella_scope_t *parent_scope) {\n"
+      "annabella_scope_t function_scope = {parent_scope};\n"
+      "annabella_scope_t *scope = &function_scope;\n"
+      "\n",
+      self->name);
+  ast_node_array_generate(&self->body, ctx);
+  string_append(&ctx->functions, "%s", ctx->value);
+  free(ctx->value);
+  ctx->value = NULL;
+  string_append(&ctx->functions, "\n"
+                                 "annabella_scope_drop(scope);\n"
+                                 "return 0;\n"
+                                 "}\n"
+                                 "\n");
+
+  string_append(&ctx->init,
+                "annabella_scope_insert_function(scope, \"%s\", __%s);\n\n",
+                self->name, self->name);
 }
 
 static const ast_node_vtable_t ast_procedure_stmt_vtable = {
@@ -56,7 +76,7 @@ ast_node_t *token_stream_procedure_stmt(token_stream_t *self) {
     token_stream_whitespace(self);
   }
 
-  eprintf("start of procedure %s\n", name);
+  // eprintf("start of procedure %s\n", name);
 
   ast_node_array_t body = {};
 
@@ -69,7 +89,7 @@ ast_node_t *token_stream_procedure_stmt(token_stream_t *self) {
   token_stream_whitespace(self);
   token_stream_ident_eq(self, name);
   token_stream_token(self, ';');
-  eprintf("end of procedure %s\n", name);
+  // eprintf("end of procedure %s\n", name);
 
   ast_procedure_stmt_t *procedure_stmt = malloc(sizeof(*procedure_stmt));
   *procedure_stmt = (ast_procedure_stmt_t){

@@ -31,7 +31,15 @@ static void ast_path_to_string(void *_self, string_t *str) {
 }
 
 static void ast_path_generate(void *_self, context_t *ctx) {
-  die("generate not implemented: %s\n", ast_node_class_name(_self));
+  ast_path_t *self = _self;
+  for (size_t i = 1; i < self->len; i++) {
+    string_append(&ctx->value, "annabella_value_get(");
+  }
+  string_append(&ctx->value, "annabella_scope_get(scope, \"%s\")",
+                self->comonents[0]);
+  for (size_t i = 1; i < self->len; i++) {
+    string_append(&ctx->value, ", \"%s\")", self->comonents[i]);
+  }
 }
 
 static const ast_node_vtable_t ast_path_vtable = {
@@ -41,7 +49,7 @@ static const ast_node_vtable_t ast_path_vtable = {
     ast_path_generate,
 };
 
-void ast_path_generate_init_fn_name(ast_node_t *_self, context_t *ctx) {
+void ast_path_generate_init_fn_name(ast_node_t *_self, string_t *str) {
   if (_self->vtable != &ast_path_vtable) {
     die("generate_init_fn_name called on a %s (expected path)\n",
         ast_node_class_name(_self));
@@ -50,9 +58,9 @@ void ast_path_generate_init_fn_name(ast_node_t *_self, context_t *ctx) {
   ast_path_t *self = (ast_path_t *)_self;
   for (size_t i = 0; i < self->len; i++) {
     if (i != 0) {
-      printf("__");
+      string_append(str, "__");
     }
-    printf("%s", self->comonents[i]);
+    string_append(str, "%s", self->comonents[i]);
   }
 }
 

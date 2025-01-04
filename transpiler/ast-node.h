@@ -1,11 +1,10 @@
 #pragma once
 
+#include "context.h"
 #include "macros.h"
 #include "str.h"
 #include "tokenizer.h"
 #include <stddef.h>
-
-typedef struct context context_t;
 
 typedef struct ast_node_vtable {
   static_str_t class_name;
@@ -53,10 +52,13 @@ extern void ast_node_array_to_string_lines(ast_node_array_t *self,
                                            string_t *str);
 extern void ast_node_array_to_string_comma(ast_node_array_t *self,
                                            string_t *str);
+extern void ast_node_array_generate(ast_node_array_t *self, context_t *ctx);
+extern void ast_node_array_generate_comma(ast_node_array_t *self,
+                                          context_t *ctx);
 
 extern ast_node_t *token_stream_path(token_stream_t *self);
 extern void token_stream_path_eq(token_stream_t *self, ast_node_t *path);
-extern void ast_path_generate_init_fn_name(ast_node_t *self, context_t *ctx);
+extern void ast_path_generate_init_fn_name(ast_node_t *self, string_t *ctx);
 
 extern ast_node_t *token_stream_stmt(token_stream_t *self);
 extern ast_node_t *token_stream_with_stmt(token_stream_t *self);

@@ -1,5 +1,4 @@
 #include "ast-node.h"
-#include "macros.h"
 #include "str.h"
 #include "token-stream.h"
 
@@ -29,7 +28,13 @@ static void ast_call_expr_to_string(void *_self, string_t *str) {
 }
 
 static void ast_call_expr_generate(void *_self, context_t *ctx) {
-  die("generate not implemented: %s\n", ast_node_class_name(_self));
+  ast_call_expr_t *self = _self;
+
+  string_append(&ctx->value, "annabella_value_call(");
+  ast_node_generate(self->function, ctx);
+  string_append(&ctx->value, ", %ld,", self->args.len);
+  ast_node_array_generate_comma(&self->args, ctx);
+  string_append(&ctx->value, ")");
 }
 
 static const ast_node_vtable_t ast_call_expr_vtable = {

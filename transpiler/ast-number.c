@@ -1,5 +1,4 @@
 #include "ast-node.h"
-#include "macros.h"
 #include "str.h"
 #include "tokenizer.h"
 
@@ -19,7 +18,9 @@ static void ast_number_to_string(void *_self, string_t *str) {
 }
 
 static void ast_number_generate(void *_self, context_t *ctx) {
-  die("generate not implemented: %s\n", ast_node_class_name(_self));
+
+  ast_number_t *self = _self;
+  string_append(&ctx->value, "annabella_number_value(%s)", self->value);
 }
 
 static const ast_node_vtable_t ast_number_vtable = {

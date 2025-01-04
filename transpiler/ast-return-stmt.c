@@ -1,5 +1,4 @@
 #include "ast-node.h"
-#include "macros.h"
 #include "token-stream.h"
 
 typedef struct ast_return_stmt {
@@ -21,7 +20,11 @@ static void ast_return_stmt_to_string(void *_self, string_t *str) {
 }
 
 static void ast_return_stmt_generate(void *_self, context_t *ctx) {
-  die("generate not implemented: %s\n", ast_node_class_name(_self));
+  ast_return_stmt_t *self = _self;
+  string_append(&ctx->value, "return_value = ");
+  ast_node_generate(self->expr, ctx);
+  string_append(&ctx->value, ";\n"
+                             "goto return_stmt;\n");
 }
 
 static const ast_node_vtable_t ast_return_stmt_vtable = {
