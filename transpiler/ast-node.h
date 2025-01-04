@@ -49,13 +49,31 @@ typedef struct ast_node_array {
 
 extern void ast_node_array_push(ast_node_array_t *self, ast_node_t *node);
 extern void ast_node_array_drop(ast_node_array_t *self);
+extern void ast_node_array_to_string_lines(ast_node_array_t *self,
+                                           string_t *str);
+extern void ast_node_array_to_string_comma(ast_node_array_t *self,
+                                           string_t *str);
 
 extern ast_node_t *token_stream_path(token_stream_t *self);
+extern void token_stream_path_eq(token_stream_t *self, ast_node_t *path);
 extern void ast_path_generate_init_fn_name(ast_node_t *self, context_t *ctx);
+
+extern ast_node_t *token_stream_stmt(token_stream_t *self);
+extern ast_node_t *token_stream_with_stmt(token_stream_t *self);
+extern ast_node_t *token_stream_package_stmt(token_stream_t *self);
+extern ast_node_t *token_stream_function_stmt(token_stream_t *self);
+extern ast_node_t *token_stream_procedure_stmt(token_stream_t *self);
+extern ast_node_t *token_stream_assignment_stmt(token_stream_t *self);
+extern ast_node_t *token_stream_expr_stmt(token_stream_t *self);
+extern ast_node_t *token_stream_return_stmt(token_stream_t *self);
+
+extern ast_node_t *token_stream_var_declaration(token_stream_t *self);
 
 extern ast_node_t *token_stream_expr(token_stream_t *self);
 extern ast_node_t *token_stream_suffix_expr(token_stream_t *self);
-extern ast_node_t *token_stream_value_expr(token_stream_t *self);
 extern ast_node_t *token_stream_call_expr(token_stream_t *self,
                                           ast_node_t *function);
+extern ast_node_t *token_stream_value_expr(token_stream_t *self);
+
 extern ast_node_t *token_stream_number(token_stream_t *self);
+extern ast_node_t *token_stream_string(token_stream_t *self);

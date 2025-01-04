@@ -3,6 +3,18 @@
 #include "tokenizer.h"
 #include <string.h>
 
+bool token_stream_is_end(token_stream_t *self) {
+  token_stream_t clone = *self;
+  switch (token_stream_next(&clone).type) {
+  case token_type_end:
+    return true;
+  case token_type_whitespace:
+    return token_stream_next(&clone).type == token_type_end;
+  default:
+    return false;
+  }
+}
+
 void token_stream_whitespace(token_stream_t *self) {
   token_stream_t clone = *self;
   if (token_stream_next(&clone).type == token_type_whitespace) {

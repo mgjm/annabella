@@ -18,6 +18,6 @@ ast_node_t *token_stream_value_expr(token_stream_t *self) {
   case token_type_number:
     return token_stream_number(self);
   case token_type_string:
-    die_with_token(token, "start of value expr");
+    return token_stream_string(self);
   }
 }

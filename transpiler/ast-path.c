@@ -102,3 +102,18 @@ ast_node_t *token_stream_path(token_stream_t *self) {
   };
   return &path->super;
 }
+
+void token_stream_path_eq(token_stream_t *self, ast_node_t *_path) {
+  if (_path->vtable != &ast_path_vtable) {
+    die("generate_init_fn_name called on a %s (expected path)\n",
+        ast_node_class_name(_path));
+  }
+
+  ast_path_t *path = (ast_path_t *)_path;
+  for (size_t i = 0; i < path->len; i++) {
+    if (i != 0) {
+      token_stream_token(self, '.');
+    }
+    token_stream_ident_eq(self, path->comonents[i]);
+  }
+}

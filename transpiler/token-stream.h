@@ -5,6 +5,7 @@
 #include "tokenizer.h"
 #include <stdbool.h>
 
+extern bool token_stream_is_end(token_stream_t *self);
 extern void token_stream_whitespace(token_stream_t *self);
 extern void token_stream_token(token_stream_t *self, char token);
 extern bool token_stream_consume_if_token(token_stream_t *self, char token);

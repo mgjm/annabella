@@ -21,7 +21,7 @@ static void ast_call_expr_to_string(void *_self, string_t *str) {
   ast_node_to_string(self->function, str);
 
   for (size_t i = 0; i < self->args.len; i++) {
-    string_append(str, "%c", i == 0 ? '(' : ',');
+    string_append(str, "%s", i == 0 ? "(" : ", ");
     ast_node_to_string(self->args.nodes[i], str);
   }
 
@@ -42,7 +42,13 @@ static const ast_node_vtable_t ast_call_expr_vtable = {
 ast_node_t *token_stream_call_expr(token_stream_t *self, ast_node_t *function) {
   ast_node_array_t args = {};
   token_stream_token(self, '(');
+  bool expect_comma = false;
   while (!token_stream_consume_if_token(self, ')')) {
+    if (expect_comma) {
+      token_stream_token(self, ',');
+      token_stream_whitespace(self);
+    }
+    expect_comma = true;
     ast_node_t *arg = token_stream_expr(self);
     ast_node_array_push(&args, arg);
   }
