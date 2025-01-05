@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stddef.h>
 
 #define PUB __attribute__((visibility("default")))
@@ -53,6 +54,7 @@ extern PUB annabella_value_t *annabella_value_get(annabella_value_t *self,
 extern PUB void annabella_value_assign(annabella_value_t *self,
                                        annabella_value_t *value);
 extern PUB annabella_value_t *annabella_value_default(annabella_value_t *self);
+extern PUB bool annabella_value_to_bool(annabella_value_t *self);
 
 extern PUB annabella_package_t *
 annabella_package_already_initializing(const char *path);

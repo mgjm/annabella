@@ -1,4 +1,5 @@
 #include "ast-node.h"
+#include "keywords.h"
 #include "token-stream.h"
 
 ast_node_t *token_stream_stmt(token_stream_t *self) {
@@ -28,6 +29,12 @@ ast_node_t *token_stream_stmt(token_stream_t *self) {
     return token_stream_package_stmt(self);
   case keyword_return:
     return token_stream_return_stmt(self);
+  case keyword_if:
+    return token_stream_if_stmt(self);
+  case keyword_elsif:
+    return token_stream_elsif_stmt(self);
+  case keyword_else:
+    return token_stream_else_stmt(self);
   default:
     die("unknown keyword statement: %s\n", keyword_get(token.keyword));
   }

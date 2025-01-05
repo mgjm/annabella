@@ -67,6 +67,9 @@ extern ast_node_t *token_stream_function_stmt(token_stream_t *self);
 extern ast_node_t *token_stream_procedure_stmt(token_stream_t *self);
 extern ast_node_t *token_stream_assignment_stmt(token_stream_t *self);
 extern ast_node_t *token_stream_expr_stmt(token_stream_t *self);
+extern ast_node_t *token_stream_if_stmt(token_stream_t *self);
+extern ast_node_t *token_stream_elsif_stmt(token_stream_t *self);
+extern ast_node_t *token_stream_else_stmt(token_stream_t *self);
 extern ast_node_t *token_stream_return_stmt(token_stream_t *self);
 
 extern ast_node_t *token_stream_var_declaration(token_stream_t *self);

@@ -104,6 +104,16 @@ value_t *annabella_value_default(value_t *self) {
   return (value_vtable(self)->default_ ?: value_default_unsupported)(self);
 }
 
+static bool value_to_bool_unsupported(void *_self) {
+  value_t *self = _self;
+  die("%s does not support being used as a condition\n",
+      value_class_name(self));
+}
+
+bool annabella_value_to_bool(annabella_value_t *self) {
+  return (value_vtable(self)->to_bool ?: value_to_bool_unsupported)(self);
+}
+
 void annabella_value_drop(value_t *self) { value_rm_ref(self); }
 
 value_t *value_add_ref(value_t *self) {

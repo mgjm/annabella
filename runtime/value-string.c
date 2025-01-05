@@ -21,7 +21,7 @@ static char *string_value_to_string(void *_self) {
   return strdup(self->value);
 }
 
-void string_value_assign(void *_self, value_t *value) {
+static void string_value_assign(void *_self, value_t *value) {
   string_value_t *self = _self;
   if (value->vtable != &string_value_vtable) {
     die("string assignment with %s %s not supported\n", value_class_name(value),

@@ -26,7 +26,7 @@ static char *integer_value_to_string(void *_self) {
   return str;
 }
 
-void integer_value_assign(void *_self, value_t *value) {
+static void integer_value_assign(void *_self, value_t *value) {
   integer_value_t *self = _self;
   if (value->vtable != &integer_value_vtable) {
     die("integer assignment with %s %s not supported\n",
@@ -37,6 +37,11 @@ void integer_value_assign(void *_self, value_t *value) {
   value_rm_ref(value);
 }
 
+static bool integer_value_to_bool(void *_self) {
+  integer_value_t *self = _self;
+  return self->value != 0;
+}
+
 static value_vtable_t integer_value_vtable = {
     "integer",
     integer_value_drop,
@@ -44,6 +49,7 @@ static value_vtable_t integer_value_vtable = {
 
     .to_string = integer_value_to_string,
     .assign = integer_value_assign,
+    .to_bool = integer_value_to_bool,
 };
 
 value_t *annabella_integer_value(integer_t value) {
