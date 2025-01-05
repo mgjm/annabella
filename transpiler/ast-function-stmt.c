@@ -14,7 +14,9 @@ typedef struct ast_function_stmt {
 static void ast_function_stmt_drop(void *_self) {
   ast_function_stmt_t *self = _self;
   ast_node_array_drop(&self->args);
-  ast_node_drop(self->return_type);
+  if (self->return_type != NULL) {
+    ast_node_drop(self->return_type);
+  }
   ast_node_array_drop(&self->vars);
   ast_node_array_drop(&self->body);
   free(self);
@@ -22,14 +24,18 @@ static void ast_function_stmt_drop(void *_self) {
 
 static void ast_function_stmt_to_string(void *_self, string_t *str) {
   ast_function_stmt_t *self = _self;
-  string_append(str, "function %s ", self->name);
+  string_append(str, "%s %s",
+                self->return_type == NULL ? "procedure" : "function",
+                self->name);
   if (self->args.len != 0) {
-    string_append(str, "(");
+    string_append(str, " (");
     ast_node_array_to_string_comma(&self->args, str);
-    string_append(str, ") ");
+    string_append(str, ")");
   }
-  string_append(str, "return ");
-  ast_node_to_string(self->return_type, str);
+  if (self->return_type != NULL) {
+    string_append(str, " return ");
+    ast_node_to_string(self->return_type, str);
+  }
   string_append(str, " is\n");
   ast_node_array_to_string_lines(&self->vars, str);
   string_append(str, "begin\n");
@@ -48,6 +54,7 @@ static void ast_function_stmt_generate(void *_self, context_t *ctx) {
                 "annabella_value_t *return_value = 0;\n"
                 "\n",
                 self->name);
+  ast_node_array_generate(&self->vars, ctx);
   ast_node_array_generate(&self->body, ctx);
   string_append(&ctx->functions, "%s", ctx->value);
   free(ctx->value);
@@ -72,16 +79,15 @@ static const ast_node_vtable_t ast_function_stmt_vtable = {
     ast_function_stmt_generate,
 };
 
-ast_node_t *token_stream_function_stmt(token_stream_t *self) {
+static ast_node_t *token_stream_function_stmt_impl(token_stream_t *self,
+                                                   bool return_allowed) {
   token_stream_whitespace(self);
   static_str_t name = token_stream_ident(self);
 
   ast_node_array_t args = {};
 
   token_stream_whitespace(self);
-  if (!token_stream_consume_if_keyword(self, keyword_return)) {
-    token_stream_token(self, '(');
-
+  if (token_stream_consume_if_token(self, '(')) {
     bool expect_dot = false;
     while (!token_stream_consume_if_token(self, ')')) {
       if (expect_dot) {
@@ -91,13 +97,16 @@ ast_node_t *token_stream_function_stmt(token_stream_t *self) {
       ast_node_t *arg = token_stream_var_declaration(self);
       ast_node_array_push(&args, arg);
     }
-
-    token_stream_whitespace(self);
-    token_stream_keyword(self, keyword_return);
   }
 
-  token_stream_whitespace(self);
-  ast_node_t *return_type = token_stream_path(self);
+  ast_node_t *return_type = NULL;
+  if (return_allowed) {
+    token_stream_whitespace(self);
+    token_stream_keyword(self, keyword_return);
+
+    token_stream_whitespace(self);
+    return_type = token_stream_path(self);
+  };
 
   token_stream_whitespace(self);
   token_stream_keyword(self, keyword_is);
@@ -133,4 +142,12 @@ ast_node_t *token_stream_function_stmt(token_stream_t *self) {
       &ast_function_stmt_vtable, name, args, return_type, vars, body,
   };
   return &function_stmt->super;
+}
+
+ast_node_t *token_stream_function_stmt(token_stream_t *self) {
+  return token_stream_function_stmt_impl(self, true);
+}
+
+ast_node_t *token_stream_procedure_stmt(token_stream_t *self) {
+  return token_stream_function_stmt_impl(self, false);
 }
