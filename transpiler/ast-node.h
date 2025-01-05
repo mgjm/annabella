@@ -70,6 +70,8 @@ extern ast_node_t *token_stream_expr_stmt(token_stream_t *self);
 extern ast_node_t *token_stream_return_stmt(token_stream_t *self);
 
 extern ast_node_t *token_stream_var_declaration(token_stream_t *self);
+extern static_str_t ast_var_declaration_name(ast_node_t *_self);
+extern ast_node_t *ast_var_declaration_type(ast_node_t *_self);
 
 extern ast_node_t *token_stream_expr(token_stream_t *self);
 extern ast_node_t *token_stream_suffix_expr(token_stream_t *self);

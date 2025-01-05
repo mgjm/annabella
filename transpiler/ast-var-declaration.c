@@ -55,3 +55,19 @@ ast_node_t *token_stream_var_declaration(token_stream_t *self) {
   };
   return &var_declaration->super;
 }
+
+static_str_t ast_var_declaration_name(ast_node_t *_self) {
+  if (_self->vtable != &ast_var_declaration_vtable) {
+    die("var declaration name, wrong self: %s\n", ast_node_class_name(_self));
+  }
+  ast_var_declaration_t *self = (ast_var_declaration_t *)_self;
+  return self->name;
+}
+
+ast_node_t *ast_var_declaration_type(ast_node_t *_self) {
+  if (_self->vtable != &ast_var_declaration_vtable) {
+    die("var declaration type, wrong self: %s\n", ast_node_class_name(_self));
+  }
+  ast_var_declaration_t *self = (ast_var_declaration_t *)_self;
+  return self->type;
+}

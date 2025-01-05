@@ -1,4 +1,5 @@
 #include "ast-node.h"
+#include "macros.h"
 #include "str.h"
 #include "token-stream.h"
 
@@ -54,6 +55,13 @@ static void ast_function_stmt_generate(void *_self, context_t *ctx) {
                 "annabella_value_t *return_value = 0;\n"
                 "\n",
                 self->name);
+  for (size_t i = 0; i < self->args.len; i++) {
+    ast_node_t *arg = self->args.nodes[i];
+    string_append(&ctx->functions,
+                  "annabella_scope_insert_value(scope, \"%s\", "
+                  "va_arg(args, annabella_value_t *));\n",
+                  ast_var_declaration_name(arg));
+  }
   ast_node_array_generate(&self->vars, ctx);
   ast_node_array_generate(&self->body, ctx);
   string_append(&ctx->functions, "%s", ctx->value);
@@ -66,10 +74,17 @@ static void ast_function_stmt_generate(void *_self, context_t *ctx) {
                                  "}\n"
                                  "\n");
 
+  for (size_t i = 0; i < self->args.len; i++) {
+    string_append(&ctx->value, ",");
+    ast_node_generate(ast_var_declaration_type(self->args.nodes[i]), ctx);
+  }
+
   string_append(&ctx->init,
                 "annabella_scope_insert_value(scope, \"%s\", "
-                "annabella_function_value(__%s, 0));\n\n",
-                self->name, self->name);
+                "annabella_function_value(__%s, %ld%s));\n\n",
+                self->name, self->name, self->args.len, ctx->value ?: "");
+  free(ctx->value);
+  ctx->value = NULL;
 }
 
 static const ast_node_vtable_t ast_function_stmt_vtable = {

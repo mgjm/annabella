@@ -16,4 +16,5 @@ begin
    str_var := "Hello World Variable";
    Ada.Text_IO.Put_Line(str_var);
    Ada.Text_IO.Put_Line(Test.GetMessage);
+   Test.PrintTemperature(20);
 end HelloWorld;

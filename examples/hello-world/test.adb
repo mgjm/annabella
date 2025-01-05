@@ -18,4 +18,9 @@ package body Test is
       Ada.Text_IO.Put_Line("Test.GetMessage called");
       return "Hello World from Ada!";
    end GetMessage;
+
+   procedure PrintTemperature(Temperature : Interfaces.Integer_32) is
+   begin
+      Ada.Text_IO.Put_Line(Temperature);
+   end PrintTemperature;
 end Test;

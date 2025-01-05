@@ -37,9 +37,12 @@ annabella_package_t *_annabella_package_Ada__Text_IO_init() {
 
   package.state = annabella_package_state_initializing;
 
+  annabella_package_scope_init(scope);
+
   annabella_scope_insert_value(
       scope, "Put_Line",
-      annabella_function_value(__Put_Line, 1, "TODO: String type"));
+      annabella_function_value(__Put_Line, 1,
+                               annabella_scope_get(scope, "String")));
 
   package.state = annabella_package_state_initialized;
   return &package;
@@ -61,6 +64,8 @@ annabella_package_t *_annabella_package_Interfaces_init() {
   }
 
   package.state = annabella_package_state_initializing;
+
+  annabella_package_scope_init(scope);
 
   annabella_scope_insert_value(scope, "Integer_32",
                                annabella_range_type_value(0, INT32_MAX));
