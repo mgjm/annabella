@@ -1,15 +1,13 @@
-.PHONY: full runtime transpiler
+.PHONY: example-hello-world build clean
 
-full: runtime transpiler
-	make -C /home/test/ada-annabella-test
+example-hello-world: build
+	make -C examples/hello-world
 
-runtime:
+build:
 	cmake -B build
-	cmake --build build -j "$(nproc)" -t annabella-rt
+	cmake --build build -j "$(nproc)"
 	cmake --install build --prefix ~/.local
 
-transpiler:
-	cmake -B build
-	cmake --build build -j "$(nproc)" -t annabella
-	cmake --install build --prefix ~/.local
-
+clean:
+	rm -rvf build
+	make -C examples/hello-world clean

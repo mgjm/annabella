@@ -1,0 +1,6 @@
+*.o
+*.c
+
+!fake-*.c
+
+/hello-world/hello-world
