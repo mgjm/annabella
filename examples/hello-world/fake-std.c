@@ -13,6 +13,8 @@ static annabella_value_t *__Put_Line(annabella_scope_t *parent_scope,
   printf("%s\n", str);
   free(str);
 
+  annabella_value_drop(msg);
+
   annabella_scope_drop(scope);
   return 0;
 }

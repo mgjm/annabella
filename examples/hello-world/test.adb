@@ -5,7 +5,7 @@ package body Test is
    function Test return Interfaces.Integer_32 is
    begin
       Ada.Text_IO.Put_Line("Test.Test called");
-      return 42;
+      return 123;
    end Test;
 
    procedure Test2 is

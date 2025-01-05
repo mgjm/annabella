@@ -1,5 +1,4 @@
 #include "ast-node.h"
-#include "macros.h"
 #include "str.h"
 #include "token-stream.h"
 
@@ -22,7 +21,11 @@ static void ast_var_declaration_to_string(void *_self, string_t *str) {
 }
 
 static void ast_var_declaration_generate(void *_self, context_t *ctx) {
-  die("generate not implemented: %s\n", ast_node_class_name(_self));
+  ast_var_declaration_t *self = _self;
+  string_append(&ctx->value,
+                "annabella_scope_insert_value(scope, \"%s\", "
+                "annabella_integer_value(0));\n",
+                self->name);
 }
 
 static const ast_node_vtable_t ast_var_declaration_vtable = {

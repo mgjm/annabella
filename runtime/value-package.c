@@ -14,6 +14,7 @@ typedef struct package_value {
 
 static void package_value_drop(void *_self) {
   package_value_t *self = _self;
+  // eprintf("warning: package %s dropped\n", self->name);
   annabella_scope_drop(&self->scope);
   free(self);
 }
@@ -25,7 +26,9 @@ static char *package_value_to_string(void *_self) {
 
 static value_t *package_value_try_get_by_key(void *_self, atom_t key) {
   package_value_t *self = _self;
-  return scope_try_get(&self->scope, key);
+  value_t *value = scope_try_get(&self->scope, key);
+  value_rm_ref(&self->super);
+  return value_add_ref(value);
 }
 
 static value_vtable_t package_value_vtable = {
@@ -40,7 +43,7 @@ static value_vtable_t package_value_vtable = {
 value_t *package_value_new() {
   package_value_t *self = malloc(sizeof(package_value_t));
   *self = (package_value_t){
-      &package_value_vtable,
+      value_base_new(&package_value_vtable),
       "<package>",
   };
   return &self->super;

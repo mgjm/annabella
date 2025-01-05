@@ -2,6 +2,7 @@
 #include "atom.h"
 #include "macros.h"
 #include "private.h"
+#include <limits.h>
 #include <stdarg.h>
 #include <string.h>
 
@@ -28,14 +29,14 @@ char *annabella_value_to_string(annabella_value_t *self) {
   return value_to_string(self);
 }
 
-static value_t *value_clone_unimplemted(void *_self) {
-  value_t *self = _self;
-  return self;
-}
+// static value_t *value_clone_unimplemted(void *_self) {
+//   value_t *self = _self;
+//   return self;
+// }
 
-value_t *value_clone(value_t *self) {
-  return (value_vtable(self)->clone ?: value_clone_unimplemted)(self);
-}
+// value_t *value_clone(value_t *self) {
+//   return (value_vtable(self)->clone ?: value_clone_unimplemted)(self);
+// }
 
 static value_t *value_to_value_unimplemted(void *_self, scope_t *scope) {
   value_t *self = _self;
@@ -84,12 +85,46 @@ value_t *annabella_value_get(value_t *self, const char *key) {
   return value_get_by_key(self, atom_new(key));
 }
 
-void annabella_value_assign(value_t *self, value_t *value) {
-  return value_vtable(self)->assign(self, value);
+static void value_assign_unsupported(void *_self, value_t *value) {
+  value_t *self = _self;
+  die("%s does not support assignment\n", value_class_name(self));
 }
 
-void annabella_value_drop(value_t *self) {
-  if (self != NULL) {
+void annabella_value_assign(value_t *self, value_t *value) {
+  return (value_vtable(self)->assign ?: value_assign_unsupported)(self, value);
+}
+
+void annabella_value_drop(value_t *self) { value_rm_ref(self); }
+
+value_t *value_add_ref(value_t *self) {
+  if (self == NULL) {
+    return self;
+  }
+
+  if (self->ref_count++ >= SSIZE_MAX) {
+    die("too many references to: %s\n", value_class_name(self));
+  }
+  // eprintf("ref++ %s: %ld (0x%lx)\n", value_class_name(self), self->ref_count,
+  //         (size_t)self);
+  return self;
+}
+
+void value_rm_ref(value_t *self) {
+  if (self == NULL) {
+    return;
+  }
+
+  if (self->ref_count >= SSIZE_MAX) {
+    die("too many references to: %s\n", value_class_name(self));
+  }
+  if (self->ref_count == 0) {
+    die("no references left to remove: %s\n", value_class_name(self));
+  }
+
+  self->ref_count--;
+  // eprintf("ref-- %s: %ld (0x%lx)\n", value_class_name(self), self->ref_count,
+  //         (size_t)self);
+  if (self->ref_count == 0) {
     self->vtable->required.drop(self);
   }
 }

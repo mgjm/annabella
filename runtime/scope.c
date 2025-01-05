@@ -101,7 +101,7 @@ value_t *scope_get(scope_t *self, atom_t key) {
 }
 
 value_t *annabella_scope_get(scope_t *self, const char *key) {
-  return value_clone(scope_get(self, atom_new(key)));
+  return value_add_ref(scope_get(self, atom_new(key)));
 }
 
 void annabella_scope_exec_main(annabella_scope_t *self) {

@@ -42,7 +42,7 @@ value_t *annabella_function_value(annabella_function_call_t call, size_t argc,
                                   ...) {
   function_value_t *self = malloc(sizeof(function_value_t));
   *self = (function_value_t){
-      &function_value_vtable,
+      value_base_new(&function_value_vtable),
       call,
       argc,
   };

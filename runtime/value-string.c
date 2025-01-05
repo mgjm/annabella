@@ -28,7 +28,7 @@ static value_vtable_t string_value_vtable = {
 value_t *string_value_from_owned(char *value) {
   string_value_t *self = malloc(sizeof(string_value_t));
   *self = (string_value_t){
-      &string_value_vtable,
+      value_base_new(&string_value_vtable),
       value,
   };
   return &self->super;

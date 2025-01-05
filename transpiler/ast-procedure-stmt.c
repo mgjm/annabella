@@ -36,6 +36,7 @@ static void ast_procedure_stmt_generate(void *_self, context_t *ctx) {
                 "annabella_scope_t *scope = &function_scope;\n"
                 "\n",
                 self->name);
+  ast_node_array_generate(&self->vars, ctx);
   ast_node_array_generate(&self->body, ctx);
   string_append(&ctx->functions, "%s", ctx->value);
   free(ctx->value);
