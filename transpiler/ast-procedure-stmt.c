@@ -29,13 +29,13 @@ static void ast_procedure_stmt_to_string(void *_self, string_t *str) {
 static void ast_procedure_stmt_generate(void *_self, context_t *ctx) {
   ast_procedure_stmt_t *self = _self;
 
-  string_append(
-      &ctx->functions,
-      "static annabella_value_t *__%s(annabella_scope_t *parent_scope) {\n"
-      "annabella_scope_t function_scope = {parent_scope};\n"
-      "annabella_scope_t *scope = &function_scope;\n"
-      "\n",
-      self->name);
+  string_append(&ctx->functions,
+                "static annabella_value_t *__%s(annabella_scope_t "
+                "*parent_scope, va_list args) {\n"
+                "annabella_scope_t function_scope = {parent_scope};\n"
+                "annabella_scope_t *scope = &function_scope;\n"
+                "\n",
+                self->name);
   ast_node_array_generate(&self->body, ctx);
   string_append(&ctx->functions, "%s", ctx->value);
   free(ctx->value);
@@ -47,7 +47,8 @@ static void ast_procedure_stmt_generate(void *_self, context_t *ctx) {
                                  "\n");
 
   string_append(&ctx->init,
-                "annabella_scope_insert_function(scope, \"%s\", __%s);\n\n",
+                "annabella_scope_insert_value(scope, \"%s\", "
+                "annabella_function_value(__%s, 0));\n\n",
                 self->name, self->name);
 }
 

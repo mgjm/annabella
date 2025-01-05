@@ -20,12 +20,12 @@ static char *string_value_to_string(void *_self) {
 static value_vtable_t string_value_vtable = {
     "string",
     string_value_drop,
-    string_value_to_string,
-    value_call_unsupported,
-    value_get_by_key_unsupported,
+    value_vtable_required_end,
+
+    .to_string = string_value_to_string,
 };
 
-value_t *annabella_string_value_from_owned(char *value) {
+value_t *string_value_from_owned(char *value) {
   string_value_t *self = malloc(sizeof(string_value_t));
   *self = (string_value_t){
       &string_value_vtable,
@@ -34,10 +34,14 @@ value_t *annabella_string_value_from_owned(char *value) {
   return &self->super;
 }
 
-value_t *annabella_string_value_from_ref(const char *value) {
-  return annabella_string_value_from_owned(strdup(value));
+value_t *string_value_from_ref(const char *value) {
+  return string_value_from_owned(strdup(value));
 }
 
-value_t *annabella_string_value_from_atom(atom_t value) {
-  return annabella_string_value_from_ref(atom_get(value));
+value_t *string_value_from_atom(atom_t value) {
+  return string_value_from_ref(atom_get(value));
+}
+
+annabella_value_t *annabella_string_value(const char *value) {
+  return string_value_from_ref(value);
 }

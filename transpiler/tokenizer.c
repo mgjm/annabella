@@ -9,8 +9,6 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-static const size_t min_read_len = 4096;
-
 static static_str_t read_to_string(str_t path) {
   eprintf("open file: %s\n", path);
 
@@ -23,10 +21,6 @@ static static_str_t read_to_string(str_t path) {
   if (len < 0) {
     die_errno("failed to seek to end: %s\n");
   }
-
-  // if (lseek(fd, 0, SEEK_SET) < 0) {
-  //   die_errno("failed to seek to start: %s\n");
-  // }
 
   static_str_t content = mmap(NULL, len, PROT_READ, MAP_PRIVATE, fd, 0);
   if (content == NULL) {
@@ -134,6 +128,15 @@ token_t token_stream_next(token_stream_t *self) {
   }
 
   case byte_type_token:
+    if (c == '-' && self->content[0] == '-') {
+      // comment
+      static_str_t nl = strchr(self->content, '\n');
+      if (nl == NULL) {
+        die("comment without trailing new line\n");
+      }
+      self->content = nl + 1;
+      return token_stream_next(self);
+    }
     return (token_t){token_type_token, .token = c};
 
   case byte_type_ident: {

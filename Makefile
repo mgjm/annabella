@@ -1,4 +1,7 @@
-.PHONY: runtime transpiler
+.PHONY: full runtime transpiler
+
+full: runtime transpiler
+	make -C /home/test/ada-annabella-test
 
 runtime:
 	cmake -B build

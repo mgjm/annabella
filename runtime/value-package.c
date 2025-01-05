@@ -30,11 +30,11 @@ static value_t *package_value_try_get_by_key(void *_self, atom_t key) {
 
 static value_vtable_t package_value_vtable = {
     "package",
-    //
     package_value_drop,
-    package_value_to_string,
-    value_call_unsupported,
-    package_value_try_get_by_key,
+    value_vtable_required_end,
+
+    .to_string = package_value_to_string,
+    .try_get_by_key = package_value_try_get_by_key,
 };
 
 value_t *package_value_new() {

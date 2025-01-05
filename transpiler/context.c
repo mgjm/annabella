@@ -13,10 +13,14 @@ void context_finalize(context_t *self) {
 
     string_append(&self->functions,
                   "int main() {\n"
-                  "annabella_scope_t scope = {};\n"
+                  "annabella_scope_t main_scope = {};\n"
+                  "annabella_scope_t *scope = &main_scope;\n"
                   "\n"
                   "%s"
                   "\n"
+                  "annabella_scope_exec_main(scope);\n"
+                  "\n"
+                  "annabella_scope_drop(scope);\n"
                   "return 0;\n"
                   "}\n",
                   self->init);

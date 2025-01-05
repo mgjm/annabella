@@ -1,5 +1,4 @@
 #include "token-stream.h"
-#include "macros.h"
 #include "tokenizer.h"
 #include <string.h>
 
@@ -16,9 +15,14 @@ bool token_stream_is_end(token_stream_t *self) {
 }
 
 void token_stream_whitespace(token_stream_t *self) {
-  token_stream_t clone = *self;
-  if (token_stream_next(&clone).type == token_type_whitespace) {
-    *self = clone;
+  // TODO: skip token_stream_next, check bytes directly
+  while (true) {
+    token_stream_t clone = *self;
+    if (token_stream_next(&clone).type == token_type_whitespace) {
+      *self = clone;
+      continue;
+    }
+    break;
   }
 }
 

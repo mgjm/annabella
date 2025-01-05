@@ -24,7 +24,7 @@ static void ast_assignment_stmt_to_string(void *_self, string_t *str) {
 static void ast_assignment_stmt_generate(void *_self, context_t *ctx) {
   ast_assignment_stmt_t *self = _self;
 
-  string_append(&ctx->value, "annabella_scope_asign(scope,\n");
+  string_append(&ctx->value, "annabella_value_assign(\n");
   ast_node_generate(self->name, ctx);
   string_append(&ctx->value, ",\n");
   ast_node_generate(self->expr, ctx);

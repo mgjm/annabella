@@ -18,9 +18,9 @@ static void ast_number_to_string(void *_self, string_t *str) {
 }
 
 static void ast_number_generate(void *_self, context_t *ctx) {
-
   ast_number_t *self = _self;
-  string_append(&ctx->value, "annabella_number_value(%s)", self->value);
+  // TODO: check number type (integer, double or big_int)?
+  string_append(&ctx->value, "annabella_integer_value(%s)", self->value);
 }
 
 static const ast_node_vtable_t ast_number_vtable = {

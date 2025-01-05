@@ -1,4 +1,5 @@
 #include "scope.h"
+#include "annabella-rt.h"
 #include "atom.h"
 #include "macros.h"
 #include "private.h"
@@ -67,6 +68,11 @@ void annabella_scope_insert_package(scope_t *self, package_t *package) {
   package_value_set_package(value, package);
 }
 
+void annabella_scope_insert_value(annabella_scope_t *self, const char *name,
+                                  annabella_value_t *value) {
+  scope_insert(self, atom_new(name), value);
+}
+
 value_t *scope_try_get(scope_t *self, atom_t key) {
   while (self != NULL) {
     for (size_t i = 0; i < self->len; i++) {
@@ -85,14 +91,22 @@ value_t *scope_get(scope_t *self, atom_t key) {
   if (value == NULL) {
     for (size_t i = 0; i < self->len; i++) {
       scope_entry_t *entry = &self->data[i];
+      eprintf("- %s: %s\n", atom_get(entry->key),
+              value_class_name(entry->value));
     }
-    die("failed to get %s from scope\n", atom_get(key));
+    die("failed to get %s from scope (%ld entries)\n", atom_get(key),
+        self->len);
   }
   return value;
 }
 
 value_t *annabella_scope_get(scope_t *self, const char *key) {
-  return scope_get(self, atom_new(key));
+  return value_clone(scope_get(self, atom_new(key)));
+}
+
+void annabella_scope_exec_main(annabella_scope_t *self) {
+  annabella_value_drop(
+      annabella_value_call(self->data[self->len - 1].value, self, 0));
 }
 
 void annabella_scope_drop(scope_t *self) {

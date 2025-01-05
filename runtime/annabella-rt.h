@@ -30,30 +30,39 @@ typedef struct annabella_package {
 
 extern PUB void annabella_scope_insert_package(annabella_scope_t *self,
                                                annabella_package_t *package);
+extern PUB void annabella_scope_insert_value(annabella_scope_t *self,
+                                             const char *name,
+                                             annabella_value_t *value);
 extern PUB annabella_value_t *annabella_scope_get(annabella_scope_t *self,
                                                   const char *key);
+extern PUB void annabella_scope_exec_main(annabella_scope_t *self);
 extern PUB void annabella_scope_drop(annabella_scope_t *self);
 
 extern PUB void annabella_value_drop(annabella_value_t *self);
+extern PUB char *annabella_value_to_string(annabella_value_t *self);
+extern PUB annabella_value_t *
+annabella_value_to_value(annabella_value_t *self, annabella_scope_t *scope);
 extern PUB annabella_value_t *annabella_value_call(annabella_value_t *self,
+                                                   annabella_scope_t *scope,
                                                    size_t argc, ...);
 extern PUB annabella_value_t *annabella_value_get(annabella_value_t *self,
                                                   const char *key);
+extern PUB void annabella_value_assign(annabella_value_t *self,
+                                       annabella_value_t *value);
 
 extern PUB annabella_package_t *
 annabella_package_already_initializing(const char *path);
-extern PUB void annabella_package_insert(annabella_package_t *self,
-                                         const char *key,
-                                         annabella_value_t *value);
 
-extern PUB annabella_value_t *
-annabella_string_value_from_ref(const char *value);
+extern PUB annabella_value_t *annabella_string_value(const char *value);
 
-typedef annabella_value_t *(*annabella_c_function_call_t)(void *self,
-                                                          size_t argc,
-                                                          va_list args);
+typedef size_t annabella_integer_t;
 extern PUB annabella_value_t *
-annabella_c_function_value_new(annabella_c_function_call_t call, void *this);
+annabella_integer_value(annabella_integer_t number);
+
+typedef annabella_value_t *(*annabella_function_call_t)(
+    annabella_scope_t *scope, va_list args);
+extern PUB annabella_value_t *
+annabella_function_value(annabella_function_call_t call, size_t argc, ...);
 
 // std library packages
 extern PUB annabella_package_t *_annabella_package_Ada__Text_IO_init();
