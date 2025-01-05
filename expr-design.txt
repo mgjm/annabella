@@ -4,5 +4,6 @@ foo() * -2 + 3 * 4
                        < _suffix_expr
 --A--   -A             < _prefix_expr
 ------A---   --A--     < _mult_expr
------------A------     < _add_expr = _mult_expr || _add_expr '+' _mult_expr  
+-----------A------     < _add_expr = _mult_expr || _add_expr '+' _mult_expr
+                       < _cmp_expr
                        < _expr

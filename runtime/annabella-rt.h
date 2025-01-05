@@ -42,6 +42,16 @@ extern PUB annabella_value_t *annabella_scope_get(annabella_scope_t *self,
 extern PUB void annabella_scope_exec_main(annabella_scope_t *self);
 extern PUB void annabella_scope_drop(annabella_scope_t *self);
 
+typedef enum annabella_cmp_op {
+  _not_an_annabella_cmp_op,
+  annabella_cmp_op_equal,
+  annabella_cmp_op_not_equal,
+  annabella_cmp_op_less,
+  annabella_cmp_op_less_or_equal,
+  annabella_cmp_op_greater,
+  annabella_cmp_op_greater_or_equal,
+} annabella_cmp_op_t;
+
 extern PUB void annabella_value_drop(annabella_value_t *self);
 extern PUB char *annabella_value_to_string(annabella_value_t *self);
 extern PUB annabella_value_t *
@@ -55,6 +65,9 @@ extern PUB void annabella_value_assign(annabella_value_t *self,
                                        annabella_value_t *value);
 extern PUB annabella_value_t *annabella_value_default(annabella_value_t *self);
 extern PUB bool annabella_value_to_bool(annabella_value_t *self);
+extern PUB annabella_value_t *annabella_value_cmp(annabella_value_t *self,
+                                                  annabella_cmp_op_t op,
+                                                  annabella_value_t *rhs);
 
 extern PUB annabella_package_t *
 annabella_package_already_initializing(const char *path);
@@ -68,6 +81,7 @@ extern PUB annabella_value_t *annabella_string_value(const char *value);
 
 extern PUB annabella_value_t *
 annabella_integer_value(annabella_integer_t number);
+extern PUB annabella_value_t *annabella_bool_value(bool value);
 
 typedef annabella_value_t *(*annabella_function_call_t)(
     annabella_scope_t *scope, va_list args);

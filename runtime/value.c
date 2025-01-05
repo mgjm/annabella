@@ -110,8 +110,17 @@ static bool value_to_bool_unsupported(void *_self) {
       value_class_name(self));
 }
 
-bool annabella_value_to_bool(annabella_value_t *self) {
+bool annabella_value_to_bool(value_t *self) {
   return (value_vtable(self)->to_bool ?: value_to_bool_unsupported)(self);
+}
+
+static value_t *value_cmp_unsupported(void *_self, cmp_op_t op, value_t *rhs) {
+  value_t *self = _self;
+  die("%s does not support comparison\n", value_class_name(self));
+}
+
+value_t *annabella_value_cmp(value_t *self, cmp_op_t op, value_t *rhs) {
+  return (value_vtable(self)->cmp ?: value_cmp_unsupported)(self, op, rhs);
 }
 
 void annabella_value_drop(value_t *self) { value_rm_ref(self); }

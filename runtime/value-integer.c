@@ -42,6 +42,43 @@ static bool integer_value_to_bool(void *_self) {
   return self->value != 0;
 }
 
+static value_t *integer_value_cmp(void *_self, cmp_op_t op, value_t *_rhs) {
+  integer_value_t *self = _self;
+  if (_rhs->vtable != &integer_value_vtable) {
+    die("integer assignment with %s %s not supported\n", value_class_name(_rhs),
+        value_to_string(_rhs));
+  }
+  integer_value_t *rhs = (integer_value_t *)_rhs;
+
+  bool result;
+  switch (op) {
+  case annabella_cmp_op_equal:
+    result = self->value == rhs->value;
+    break;
+  case annabella_cmp_op_not_equal:
+    result = self->value != rhs->value;
+    break;
+  case annabella_cmp_op_less:
+    result = self->value < rhs->value;
+    break;
+  case annabella_cmp_op_less_or_equal:
+    result = self->value <= rhs->value;
+    break;
+  case annabella_cmp_op_greater:
+    result = self->value > rhs->value;
+    break;
+  case annabella_cmp_op_greater_or_equal:
+    result = self->value >= rhs->value;
+    break;
+  default:
+    die("unknown comparision operator: %d\n", op);
+  }
+
+  value_rm_ref(&self->super);
+  value_rm_ref(&rhs->super);
+  return annabella_bool_value(result);
+}
+
 static value_vtable_t integer_value_vtable = {
     "integer",
     integer_value_drop,
@@ -50,6 +87,7 @@ static value_vtable_t integer_value_vtable = {
     .to_string = integer_value_to_string,
     .assign = integer_value_assign,
     .to_bool = integer_value_to_bool,
+    .cmp = integer_value_cmp,
 };
 
 value_t *annabella_integer_value(integer_t value) {

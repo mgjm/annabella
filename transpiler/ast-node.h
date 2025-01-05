@@ -77,6 +77,7 @@ extern static_str_t ast_var_declaration_name(ast_node_t *_self);
 extern ast_node_t *ast_var_declaration_type(ast_node_t *_self);
 
 extern ast_node_t *token_stream_expr(token_stream_t *self);
+extern ast_node_t *token_stream_cmp_expr(token_stream_t *self);
 extern ast_node_t *token_stream_suffix_expr(token_stream_t *self);
 extern ast_node_t *token_stream_call_expr(token_stream_t *self,
                                           ast_node_t *function);
