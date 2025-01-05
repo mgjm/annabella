@@ -22,10 +22,12 @@ static void ast_var_declaration_to_string(void *_self, string_t *str) {
 
 static void ast_var_declaration_generate(void *_self, context_t *ctx) {
   ast_var_declaration_t *self = _self;
-  string_append(&ctx->value,
-                "annabella_scope_insert_value(scope, \"%s\", "
-                "annabella_integer_value(0));\n",
-                self->name);
+  string_append(
+      &ctx->value,
+      "annabella_scope_insert_value(scope, \"%s\", annabella_value_default(",
+      self->name);
+  ast_node_generate(self->type, ctx);
+  string_append(&ctx->value, "));\n");
 }
 
 static const ast_node_vtable_t ast_var_declaration_vtable = {

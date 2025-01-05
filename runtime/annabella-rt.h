@@ -28,6 +28,9 @@ typedef struct annabella_package {
   annabella_scope_t scope;
 } annabella_package_t;
 
+extern PUB void annabella_main_scope_init(annabella_scope_t *self);
+extern PUB void annabella_package_scope_init(annabella_scope_t *self);
+
 extern PUB void annabella_scope_insert_package(annabella_scope_t *self,
                                                annabella_package_t *package);
 extern PUB void annabella_scope_insert_value(annabella_scope_t *self,
@@ -49,13 +52,18 @@ extern PUB annabella_value_t *annabella_value_get(annabella_value_t *self,
                                                   const char *key);
 extern PUB void annabella_value_assign(annabella_value_t *self,
                                        annabella_value_t *value);
+extern PUB annabella_value_t *annabella_value_default(annabella_value_t *self);
 
 extern PUB annabella_package_t *
 annabella_package_already_initializing(const char *path);
 
+typedef size_t annabella_integer_t;
+
+extern PUB annabella_value_t *
+annabella_range_type_value(annabella_integer_t min, annabella_integer_t max);
+
 extern PUB annabella_value_t *annabella_string_value(const char *value);
 
-typedef size_t annabella_integer_t;
 extern PUB annabella_value_t *
 annabella_integer_value(annabella_integer_t number);
 
@@ -63,6 +71,3 @@ typedef annabella_value_t *(*annabella_function_call_t)(
     annabella_scope_t *scope, va_list args);
 extern PUB annabella_value_t *
 annabella_function_value(annabella_function_call_t call, size_t argc, ...);
-
-// std library packages
-extern PUB annabella_package_t *_annabella_package_Ada__Text_IO_init();

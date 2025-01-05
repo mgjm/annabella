@@ -1,4 +1,5 @@
 #include "annabella-rt.h"
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -60,6 +61,9 @@ annabella_package_t *_annabella_package_Interfaces_init() {
   }
 
   package.state = annabella_package_state_initializing;
+
+  annabella_scope_insert_value(scope, "Integer_32",
+                               annabella_range_type_value(0, INT32_MAX));
 
   package.state = annabella_package_state_initialized;
   return &package;

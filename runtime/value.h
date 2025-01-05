@@ -26,6 +26,7 @@ typedef struct value_vtable {
   value_t *(*call)(void *self, scope_t *scope, size_t argc, va_list args);
   value_t *(*try_get_by_key)(void *self, atom_t key);
   void (*assign)(void *self, value_t *value);
+  value_t *(*default_)(void *self);
 } value_vtable_t;
 
 struct annabella_value {

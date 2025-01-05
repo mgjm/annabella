@@ -16,6 +16,8 @@ void context_finalize(context_t *self) {
                   "annabella_scope_t main_scope = {};\n"
                   "annabella_scope_t *scope = &main_scope;\n"
                   "\n"
+                  "annabella_main_scope_init(scope);\n"
+                  "\n"
                   "%s"
                   "\n"
                   "annabella_scope_exec_main(scope);\n"

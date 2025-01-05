@@ -94,6 +94,16 @@ void annabella_value_assign(value_t *self, value_t *value) {
   return (value_vtable(self)->assign ?: value_assign_unsupported)(self, value);
 }
 
+static value_t *value_default_unsupported(void *_self) {
+  value_t *self = _self;
+  die("%s does not support createing a default value\n",
+      value_class_name(self));
+}
+
+value_t *annabella_value_default(value_t *self) {
+  return (value_vtable(self)->default_ ?: value_default_unsupported)(self);
+}
+
 void annabella_value_drop(value_t *self) { value_rm_ref(self); }
 
 value_t *value_add_ref(value_t *self) {

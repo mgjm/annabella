@@ -56,6 +56,8 @@ static void ast_package_stmt_generate(void *_self, context_t *ctx) {
                 "package.state = annabella_package_state_initializing;\n"
                 "\n"
                 "\n"
+                "annabella_package_scope_init(scope);\n"
+                "\n"
                 "%s"
                 "\n"
                 "package.state = annabella_package_state_initialized;\n"
