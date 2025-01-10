@@ -57,7 +57,6 @@ extern PUB char *annabella_value_to_string(annabella_value_t *self);
 extern PUB annabella_value_t *
 annabella_value_to_value(annabella_value_t *self, annabella_scope_t *scope);
 extern PUB annabella_value_t *annabella_value_call(annabella_value_t *self,
-                                                   annabella_scope_t *scope,
                                                    size_t argc, ...);
 extern PUB annabella_value_t *annabella_value_get(annabella_value_t *self,
                                                   const char *key);
@@ -86,4 +85,5 @@ extern PUB annabella_value_t *annabella_bool_value(bool value);
 typedef annabella_value_t *(*annabella_function_call_t)(
     annabella_scope_t *scope, va_list args);
 extern PUB annabella_value_t *
-annabella_function_value(annabella_function_call_t call, size_t argc, ...);
+annabella_function_value(annabella_function_call_t call,
+                         annabella_scope_t *scope, size_t argc, ...);

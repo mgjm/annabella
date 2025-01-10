@@ -41,7 +41,7 @@ annabella_package_t *_annabella_package_Ada__Text_IO_init() {
 
   annabella_scope_insert_value(
       scope, "Put_Line",
-      annabella_function_value(__Put_Line, 1,
+      annabella_function_value(__Put_Line, scope, 1,
                                annabella_scope_get(scope, "String")));
 
   package.state = annabella_package_state_initialized;

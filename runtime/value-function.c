@@ -9,6 +9,7 @@
 typedef struct function_value {
   value_t super;
   annabella_function_call_t call;
+  scope_t *scope;
   size_t argc;
   value_t **args;
 } function_value_t;
@@ -24,16 +25,15 @@ static void function_value_drop(void *_self) {
 
 static value_t *function_value_to_value(void *_self, scope_t *scope) {
   function_value_t *self = _self;
-  return annabella_value_call(&self->super, scope, 0);
+  return annabella_value_call(&self->super, 0);
 }
 
-static value_t *function_value_call(void *_self, scope_t *scope, size_t argc,
-                                    va_list args) {
+static value_t *function_value_call(void *_self, size_t argc, va_list args) {
   function_value_t *self = _self;
   if (self->argc != argc) {
     die("number of arguments does not match %ld != %ld\n", argc, self->argc);
   }
-  return self->call(scope, args);
+  return self->call(self->scope, args);
 }
 
 static value_vtable_t function_value_vtable = {
@@ -45,8 +45,8 @@ static value_vtable_t function_value_vtable = {
     .call = function_value_call,
 };
 
-value_t *annabella_function_value(annabella_function_call_t call, size_t argc,
-                                  ...) {
+value_t *annabella_function_value(annabella_function_call_t call,
+                                  scope_t *scope, size_t argc, ...) {
   va_list args = {};
   va_start(args, argc);
   value_t **args_array = NULL;
@@ -61,10 +61,7 @@ value_t *annabella_function_value(annabella_function_call_t call, size_t argc,
 
   function_value_t *self = malloc(sizeof(function_value_t));
   *self = (function_value_t){
-      value_base_new(&function_value_vtable),
-      call,
-      argc,
-      args_array,
+      value_base_new(&function_value_vtable), call, scope, argc, args_array,
   };
   return &self->super;
 }

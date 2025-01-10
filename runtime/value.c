@@ -48,17 +48,16 @@ value_t *annabella_value_to_value(value_t *self, scope_t *scope) {
                                                                       scope);
 }
 
-static value_t *value_call_unsupported(void *_self, scope_t *scope, size_t argc,
-                                       va_list args) {
+static value_t *value_call_unsupported(void *_self, size_t argc, va_list args) {
   value_t *self = _self;
   die("%s does not support calling\n", value_class_name(self));
 }
 
-value_t *annabella_value_call(value_t *self, scope_t *scope, size_t argc, ...) {
+value_t *annabella_value_call(value_t *self, size_t argc, ...) {
   va_list args;
   va_start(args, argc);
-  value_t *result = (value_vtable(self)->call
-                         ?: value_call_unsupported)(self, scope, argc, args);
+  value_t *result =
+      (value_vtable(self)->call ?: value_call_unsupported)(self, argc, args);
   va_end(args);
   return result;
 }

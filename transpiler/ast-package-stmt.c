@@ -26,6 +26,12 @@ static void ast_package_stmt_to_string(void *_self, string_t *str) {
   string_append(str, ";\n");
 }
 
+// NOTE:
+// There is currenty no public vs provate package scope.
+// All identifiers defined or available in a package are also exported by that
+// package. If we run into problems later on we can split the scope to a
+// private_scope and a public_scope.
+
 static void ast_package_stmt_generate(void *_self, context_t *ctx) {
   ast_package_stmt_t *self = _self;
 

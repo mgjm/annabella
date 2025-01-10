@@ -106,7 +106,7 @@ value_t *annabella_scope_get(scope_t *self, const char *key) {
 
 void annabella_scope_exec_main(annabella_scope_t *self) {
   annabella_value_drop(
-      annabella_value_call(self->data[self->len - 1].value, self, 0));
+      annabella_value_call(self->data[self->len - 1].value, 0));
 }
 
 void annabella_scope_drop(scope_t *self) {

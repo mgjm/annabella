@@ -23,7 +23,7 @@ typedef struct value_vtable {
   char *(*to_string)(void *self);
   // value_t *(*clone)(void *self);
   value_t *(*to_value)(void *self, scope_t *scope);
-  value_t *(*call)(void *self, scope_t *scope, size_t argc, va_list args);
+  value_t *(*call)(void *self, size_t argc, va_list args);
   value_t *(*try_get_by_key)(void *self, atom_t key);
   void (*assign)(void *self, value_t *value);
   value_t *(*default_)(void *self);

@@ -1,5 +1,4 @@
 #include "ast-node.h"
-#include "macros.h"
 #include "str.h"
 #include "token-stream.h"
 
@@ -81,7 +80,7 @@ static void ast_function_stmt_generate(void *_self, context_t *ctx) {
 
   string_append(&ctx->init,
                 "annabella_scope_insert_value(scope, \"%s\", "
-                "annabella_function_value(__%s, %ld%s));\n\n",
+                "annabella_function_value(__%s, scope, %ld%s));\n\n",
                 self->name, self->name, self->args.len, ctx->value ?: "");
   free(ctx->value);
   ctx->value = NULL;

@@ -32,7 +32,7 @@ static void ast_call_expr_generate(void *_self, context_t *ctx) {
 
   string_append(&ctx->value, "annabella_value_call(");
   ast_node_generate(self->function, ctx);
-  string_append(&ctx->value, ", scope, %ld,", self->args.len);
+  string_append(&ctx->value, ", %ld,", self->args.len);
   ast_node_array_generate_comma(&self->args, ctx);
   string_append(&ctx->value, ")");
 }
