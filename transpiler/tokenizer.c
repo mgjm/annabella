@@ -66,6 +66,97 @@ byte_type_t byte_type(char c) {
   }
 }
 
+static void token_stream_consume_numeral(token_stream_t *self) {
+  while (true) {
+    char c = self->content[0];
+    if (byte_type(c) != byte_type_number) {
+      return;
+    }
+    if (*self->content++ == '_') {
+      self->content++;
+    }
+  }
+}
+
+static void token_stream_consume_based_numeral(token_stream_t *self) {
+  while (true) {
+    char c = self->content[0];
+    switch (byte_type(c)) {
+    case byte_type_number:
+      break;
+    case byte_type_ident:
+      if (('a' <= c && c <= 'f') || ('A' <= c && c <= 'F')) {
+        break;
+      }
+      return;
+    default:
+      return;
+    }
+    if (*self->content++ == '_') {
+      self->content++;
+    }
+  }
+}
+
+static void token_stream_consume_opt_exponent(token_stream_t *self) {
+  switch (self->content[0]) {
+  case 'e':
+  case 'E':
+    self->content++;
+    break;
+  default:
+    return;
+  }
+  switch (self->content[0]) {
+  case '-':
+  case '+':
+    self->content++;
+    break;
+  default:
+    break;
+  }
+  token_stream_consume_numeral(self);
+}
+
+static token_t token_stream_next_number(token_stream_t *self) {
+  static_str_t start = self->content - 1;
+
+  if (*self->content == '_') {
+    self->content++;
+  }
+  token_stream_consume_numeral(self);
+  switch (self->content[0]) {
+  case '.':
+    self->content++;
+    token_stream_consume_numeral(self);
+    token_stream_consume_opt_exponent(self);
+    break;
+  case '#':
+    self->content++;
+    token_stream_consume_based_numeral(self);
+    if (self->content[0] == '.') {
+      self->content++;
+      token_stream_consume_based_numeral(self);
+    }
+    if (self->content[0] != '#') {
+      die("unterminated based number literal\n");
+    }
+    self->content++;
+    token_stream_consume_opt_exponent(self);
+    break;
+  default:
+    token_stream_consume_opt_exponent(self);
+    break;
+  }
+
+  string_t string = strndup(start, self->content - start);
+  if (string == NULL) {
+    die("failed to allocate number token\n");
+  }
+
+  return (token_t){token_type_number, .number = string};
+}
+
 token_t token_stream_next(token_stream_t *self) {
   char c = *self->content++;
   switch (byte_type(c)) {
@@ -165,35 +256,8 @@ token_t token_stream_next(token_stream_t *self) {
     }
   }
 
-  case byte_type_number: {
-    static_str_t start = self->content - 1;
-    bool had_dot = false;
-    while (true) {
-      c = self->content[0];
-      switch (byte_type(c)) {
-      case byte_type_number:
-        self->content++;
-        continue;
-      case byte_type_token:
-        if (c == '.' && !had_dot) {
-          had_dot = true;
-          self->content++;
-          continue;
-        }
-        break;
-      default:
-        break;
-      }
-      break;
-    }
-
-    string_t string = strndup(start, self->content - start);
-    if (string == NULL) {
-      die("failed to allocate number token\n");
-    }
-
-    return (token_t){token_type_number, .number = string};
-  }
+  case byte_type_number:
+    return token_stream_next_number(self);
   }
 }
 
