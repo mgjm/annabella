@@ -8,10 +8,16 @@ end;
 function Test return Integer is
 begin
    "Inside Test function";
-   return 123;
+   return 9000;
 end;
 
-procedure Test2 (foo: Integer; bar: String) is
+function Test return String is
+begin
+   "Inside Test function";
+   return "Test overload";
+end;
+
+procedure Test (foo: Integer; bar: String) is
 begin
    "Test2:";
    foo * 1000;
@@ -63,10 +69,8 @@ begin
    "Start";
    "Hello \n World""";
    'x';
-   123;
    FooBar;
-   Test;
-   Test2(Test + 1, "Hello");
+   Test(Test, Test);
    1 + 2 * 5 / 2 > 1 or 5 > 2;
    "End";
 end;

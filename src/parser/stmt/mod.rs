@@ -3,7 +3,7 @@ use crate::{
     Token,
 };
 
-use super::{Expr, Name, Parenthesized, Parse, ParseStream, Result};
+use super::{Expr, Parenthesized, Parse, ParseStream, Result};
 
 parse_enum! {
     enum Stmt {

@@ -4,7 +4,7 @@ use crate::{
 };
 
 use super::{
-    CCode, CodeGenExpr, CodeGenStmt, Context, FunctionType, FunctionValue, RcType, Type, Value,
+    CCode, CodeGenExpr, CodeGenStmt, Context, ExprValue, FunctionType, FunctionValue, Type, Value,
     VariableValue,
 };
 
@@ -20,7 +20,10 @@ impl CodeGenStmt for Stmt {
 
 impl CodeGenStmt for ExprStmt {
     fn generate(&self, ctx: &mut Context) -> Result<CCode> {
-        let expr = self.expr.generate(ctx)?;
+        let ExprValue::Distinct(expr) = self.expr.generate(ctx)? else {
+            return Err(self.expr.unrecoverable_error("ambiguous expression"));
+        };
+
         let (fmt, use_value) = expr.ty.fmt();
         Ok(if use_value {
             c_code! {
@@ -37,7 +40,10 @@ impl CodeGenStmt for ExprStmt {
 
 impl CodeGenStmt for ReturnStmt {
     fn generate(&self, ctx: &mut Context) -> Result<CCode> {
-        let expr = self.expr.generate(ctx)?;
+        let ExprValue::Distinct(expr) = self.expr.generate(ctx)? else {
+            return Err(self.expr.unrecoverable_error("ambiguous expression"));
+        };
+
         Ok(c_code! {
             return #expr;
         })
@@ -120,10 +126,10 @@ impl CodeGenStmt for Function {
 
         ctx.insert(
             &self.name,
-            Value::Function(FunctionValue {
+            Value::Function(FunctionValue::new(
                 name,
-                ty: Type::Function(FunctionType { args, return_type }).into(),
-            }),
+                Type::Function(FunctionType { args, return_type }).into(),
+            )),
         )?;
         Ok(c_code!())
     }

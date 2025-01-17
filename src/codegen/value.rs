@@ -5,7 +5,7 @@ use crate::{
     tokenizer::{Ident, Spanned},
 };
 
-use super::{CCode, RcType};
+use super::{CCode, ExprValue, RcType, SingleExprValue};
 
 #[derive(Debug, Default)]
 pub struct Scope<'a> {
@@ -57,40 +57,45 @@ impl Value {
         this.insert(ident, other)
     }
 
-    pub fn ty(&self) -> RcType {
+    pub fn expr_value(&self) -> ExprValue {
         match self {
-            Self::Function(value) => value.ty(),
-            Self::Variable(value) => value.ty(),
-        }
-    }
-
-    pub fn code(&self) -> CCode {
-        match self {
-            Self::Function(value) => value.code(),
-            Self::Variable(value) => value.code(),
+            Self::Function(value) => value.expr_value(),
+            Self::Variable(value) => value.expr_value(),
         }
     }
 }
 
 #[derive(Debug)]
 pub struct FunctionValue {
-    pub name: CCode,
-    pub ty: RcType,
+    overloads: Vec<FunctionOverload>,
 }
 
 impl FunctionValue {
+    pub fn new(name: CCode, ty: RcType) -> Self {
+        Self {
+            overloads: vec![FunctionOverload { name, ty }],
+        }
+    }
+
     fn insert(&mut self, ident: &Ident, value: Self) -> Result<()> {
-        let _ = value;
-        Err(ident.unrecoverable_error("function overloading not yet implemented"))
+        let _ = ident;
+        self.overloads.extend(value.overloads);
+        Ok(())
     }
 
-    fn ty(&self) -> RcType {
-        self.ty.clone()
+    pub fn expr_value(&self) -> ExprValue {
+        ExprValue::new(self.overloads.iter().map(|ol| SingleExprValue {
+            ty: ol.ty.clone(),
+            code: ol.name.clone(),
+        }))
+        .unwrap()
     }
+}
 
-    fn code(&self) -> CCode {
-        self.name.clone()
-    }
+#[derive(Debug)]
+struct FunctionOverload {
+    pub name: CCode,
+    pub ty: RcType,
 }
 
 #[derive(Debug)]
@@ -100,11 +105,11 @@ pub struct VariableValue {
 }
 
 impl VariableValue {
-    fn ty(&self) -> RcType {
-        self.ty.clone()
-    }
-
-    fn code(&self) -> CCode {
-        self.name.clone()
+    pub fn expr_value(&self) -> ExprValue {
+        SingleExprValue {
+            ty: self.ty.clone(),
+            code: self.name.clone(),
+        }
+        .into()
     }
 }

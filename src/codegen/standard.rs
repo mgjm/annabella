@@ -21,14 +21,14 @@ pub fn generate(ctx: &mut Context) -> Result<()> {
 
                 ctx.insert(
                     &op.operator_symbol(),
-                    Value::Function(FunctionValue {
-                        name: c_code! { #ident },
-                        ty: Type::Function(FunctionType {
+                    Value::Function(FunctionValue::new(
+                         c_code! { #ident },
+                         Type::Function(FunctionType {
                             args: vec![Type::Integer.into(), Type::Integer.into()],
                             return_type: Type::Integer.into(),
                         })
                         .into(),
-                    }),
+                    )),
                 )?;
 
             )*

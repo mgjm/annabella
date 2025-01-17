@@ -5,10 +5,10 @@ use crate::{
         BaseName, BinaryOp, Expr, ExprBinary, ExprLit, FunctionCall, LitChar, LitNumber, LitStr,
         Name, Result,
     },
-    tokenizer::{Ident, Spanned},
+    tokenizer::{Ident, Span, Spanned},
 };
 
-use super::{CCode, CodeGenExpr, Context, ExprValue, Type, Value};
+use super::{CCode, CodeGenExpr, Context, ExprValue, SingleExprValue, Type, Value};
 
 impl CodeGenExpr for Expr {
     #[expect(unused_variables)]
@@ -36,30 +36,33 @@ impl CodeGenExpr for ExprLit {
 impl CodeGenExpr for LitStr {
     fn generate(&self, _ctx: &mut Context) -> Result<ExprValue> {
         let str = self.str();
-        Ok(ExprValue {
+        Ok(SingleExprValue {
             ty: Type::String.into(),
             code: c_code! { #str },
-        })
+        }
+        .into())
     }
 }
 
 impl CodeGenExpr for LitChar {
     fn generate(&self, _ctx: &mut Context) -> Result<ExprValue> {
         let char = self.char();
-        Ok(ExprValue {
+        Ok(SingleExprValue {
             ty: Type::Character.into(),
             code: c_code! { #char },
-        })
+        }
+        .into())
     }
 }
 
 impl CodeGenExpr for LitNumber {
     fn generate(&self, _ctx: &mut Context) -> Result<ExprValue> {
         let num = self.number::<i32>();
-        Ok(ExprValue {
+        Ok(SingleExprValue {
             ty: Type::Integer.into(),
             code: c_code! { #num },
-        })
+        }
+        .into())
     }
 }
 
@@ -75,13 +78,7 @@ impl CodeGenExpr for Name {
 impl CodeGenExpr for BaseName {
     fn generate(&self, ctx: &mut Context) -> Result<ExprValue> {
         Ok(match self {
-            BaseName::Ident(ident) => {
-                let val = ctx.get(ident)?;
-                ExprValue {
-                    ty: val.ty(),
-                    code: val.code(),
-                }
-            }
+            BaseName::Ident(ident) => ctx.get(ident)?.expr_value(),
         })
     }
 }
@@ -91,44 +88,51 @@ where
     A: ExactSizeIterator<Item = &'a Expr> + Clone,
 {
     let f = name.generate(ctx)?;
-    let Type::Function(ty) = &*f.ty else {
-        return Err(name.unrecoverable_error("is not a function"));
-    };
-    let args = {
-        let mut args = args;
+    f.flat_map(|f| {
+        let Type::Function(ty) = &*f.ty else {
+            return Err(name.unrecoverable_error("is not a function"));
+        };
 
-        let ty_num = ty.args.len();
-        let arg_num = args.len();
-        match arg_num.cmp(&ty_num) {
-            std::cmp::Ordering::Less => {
-                return Err(
-                    name.unrecoverable_error(format!("missing arguments: {arg_num} of {ty_num}"))
-                )
-            }
-            std::cmp::Ordering::Equal => {}
-            std::cmp::Ordering::Greater => {
-                return Err(args
-                    .nth(ty_num)
-                    .unwrap()
-                    .unrecoverable_error(format!("unexpected argument: {arg_num} of {ty_num}")))
-            }
-        }
+        let args = {
+            let mut args = args.clone();
 
-        args.zip(&ty.args)
-            .map(|(arg, ty)| {
-                let value = arg.generate(ctx)?;
-                if *ty != value.ty {
-                    return Err(arg.unrecoverable_error(format!("wrong type, expected: {ty:?}")));
+            let ty_num = ty.args.len();
+            let arg_num = args.len();
+            match arg_num.cmp(&ty_num) {
+                std::cmp::Ordering::Less => {
+                    return Err(name
+                        .unrecoverable_error(format!("missing arguments: {arg_num} of {ty_num}")))
                 }
-                Ok(value)
-            })
-            .collect::<Result<Vec<_>>>()?
-    };
-    Ok(ExprValue {
-        ty: ty.return_type.clone(),
-        code: c_code! {
-            #f(#(#args),*)
-        },
+                std::cmp::Ordering::Equal => {}
+                std::cmp::Ordering::Greater => {
+                    return Err(args.nth(ty_num).unwrap().unrecoverable_error(format!(
+                        "unexpected argument: {arg_num} of {ty_num}"
+                    )))
+                }
+            }
+
+            args.zip(&ty.args)
+                .map(|(arg, ty)| {
+                    let value = arg.generate(ctx)?;
+                    match value.filter(|value| value.ty == *ty) {
+                        Some(ExprValue::Distinct(value)) => Ok(value),
+                        Some(ExprValue::Ambiguous(_)) => {
+                            Err(arg.unrecoverable_error("ambiguous argument type"))
+                        }
+                        None => {
+                            Err(arg.unrecoverable_error(format!("wrong type, expected: {ty:?}")))
+                        }
+                    }
+                })
+                .collect::<Result<Vec<_>>>()?
+        };
+        Ok(SingleExprValue {
+            ty: ty.return_type.clone(),
+            code: c_code! {
+                #f(#(#args),*)
+            },
+        }
+        .into())
     })
 }
 
@@ -174,12 +178,19 @@ impl CodeGenExpr for ExprBinary {
 
 impl ExprValue {
     fn implicit_dereference(self, _ctx: &mut Context) -> Result<ExprValue> {
-        Ok(match &*self.ty {
-            Type::Function(f) if f.args.is_empty() => ExprValue {
-                ty: f.return_type.clone(),
-                code: c_code! { #self() },
-            },
-            _ => self,
+        self.flat_map(|value| {
+            Ok(match &*value.ty {
+                Type::Function(f) if f.args.is_empty() => SingleExprValue {
+                    ty: f.return_type.clone(),
+                    code: c_code! { #value() },
+                }
+                .into(),
+                Type::Function(_) => {
+                    return Err(Span::call_site()
+                        .unrecoverable_error("implicit dereference on function with arguments"))
+                }
+                _ => value.into(),
+            })
         })
     }
 }
