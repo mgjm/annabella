@@ -1,0 +1,13 @@
+[package]
+name = "annabella-rs"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = ["span-locations"]
+span-locations = []
+
+[dependencies]
+anyhow = "1.0.95"
+proc-macro2 = { version = "1.0.93", default-features = false }
+quote = { version = "1.0.38", default-features = false }
