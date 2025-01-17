@@ -57,7 +57,7 @@ impl Value {
         this.insert(ident, other)
     }
 
-    pub fn expr_value(&self) -> ExprValue {
+    pub(super) fn expr_value(&self) -> ExprValue {
         match self {
             Self::Function(value) => value.expr_value(),
             Self::Variable(value) => value.expr_value(),
@@ -83,7 +83,7 @@ impl FunctionValue {
         Ok(())
     }
 
-    pub fn expr_value(&self) -> ExprValue {
+    pub(super) fn expr_value(&self) -> ExprValue {
         ExprValue::new(self.overloads.iter().map(|ol| SingleExprValue {
             ty: ol.ty.clone(),
             code: ol.name.clone(),
@@ -105,7 +105,7 @@ pub struct VariableValue {
 }
 
 impl VariableValue {
-    pub fn expr_value(&self) -> ExprValue {
+    pub(super) fn expr_value(&self) -> ExprValue {
         SingleExprValue {
             ty: self.ty.clone(),
             code: self.name.clone(),

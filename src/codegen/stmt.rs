@@ -1,19 +1,16 @@
 use crate::{
-    parser::{ExprStmt, Function, Result, ReturnStmt, Stmt},
+    parser::{AssignStmt, ExprStmt, Result, ReturnStmt, Stmt},
     tokenizer::Spanned,
 };
 
-use super::{
-    CCode, CodeGenExpr, CodeGenStmt, Context, ExprValue, FunctionType, FunctionValue, Type, Value,
-    VariableValue,
-};
+use super::{CCode, CodeGenExpr, CodeGenStmt, Context, ExprValue};
 
 impl CodeGenStmt for Stmt {
     fn generate(&self, ctx: &mut Context) -> Result<CCode> {
         match self {
             Stmt::Expr(stmt) => stmt.generate(ctx),
             Stmt::Return(stmt) => stmt.generate(ctx),
-            Stmt::Function(stmt) => stmt.generate(ctx),
+            Stmt::Assign(stmt) => stmt.generate(ctx),
         }
     }
 }
@@ -50,87 +47,16 @@ impl CodeGenStmt for ReturnStmt {
     }
 }
 
-impl Function {
-    fn c_name(&self) -> CCode {
-        use std::fmt::Write;
-
-        let mut ident = format!("annabella_{}_", self.name);
-        if let Some(args) = &self.args {
-            for arg in args.iter() {
-                write!(ident, "__{}", arg.ty).unwrap();
-            }
-        }
-        if let Some((_, ty)) = &self.return_type {
-            write!(ident, "___{ty}").unwrap();
-        }
-        let ident = quote::format_ident!("{}", ident);
-        c_code! {
-            #ident
-        }
-    }
-}
-
-impl CodeGenStmt for Function {
+impl CodeGenStmt for AssignStmt {
     fn generate(&self, ctx: &mut Context) -> Result<CCode> {
-        let name = self.c_name();
-        let args = self.args().map(|arg| {
-            let name = &arg.name;
-            let ty = &arg.ty;
-            c_code! { #ty #name }
-        });
-
-        let mut sub_ctx = ctx.subscope();
-        for arg in self.args() {
-            let name = &arg.name;
-            sub_ctx.insert(
-                &arg.name,
-                Value::Variable(VariableValue {
-                    name: c_code! { #name },
-                    ty: Type::parse(&arg.ty.name)
-                        .ok_or_else(|| arg.ty.unrecoverable_error("unknown type"))?,
-                }),
-            )?;
-        }
-
-        let stmts = self
-            .stmts
-            .iter()
-            .map(|stmt| stmt.generate(&mut sub_ctx))
-            .collect::<Result<Vec<_>>>()?;
-
-        let return_type = if let Some(ty) = self.return_type() {
-            c_code! { #ty }
-        } else {
-            c_code! { void }
+        let ExprValue::Distinct(name) = self.name.generate(ctx)? else {
+            return Err(self.name.unrecoverable_error("ambiguous expression"));
         };
-
-        ctx.push_function(c_code! {
-            #return_type #name(#(#args),*) {
-                #(#stmts)*
-            }
-        });
-
-        let args = self
-            .args()
-            .map(|arg| {
-                Type::parse(&arg.ty.name)
-                    .ok_or_else(|| arg.ty.unrecoverable_error("unsupported type"))
-            })
-            .collect::<Result<Vec<_>>>()?;
-
-        let return_type = if let Some(ty) = self.return_type() {
-            Type::parse(&ty.name).ok_or_else(|| ty.unrecoverable_error("unspupported type"))?
-        } else {
-            Type::Void.into()
+        let ExprValue::Distinct(expr) = self.expr.generate(ctx)? else {
+            return Err(self.expr.unrecoverable_error("ambiguous expression"));
         };
-
-        ctx.insert(
-            &self.name,
-            Value::Function(FunctionValue::new(
-                name,
-                Type::Function(FunctionType { args, return_type }).into(),
-            )),
-        )?;
-        Ok(c_code!())
+        Ok(c_code! {
+            #name = #expr;
+        })
     }
 }

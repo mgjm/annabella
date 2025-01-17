@@ -1,7 +1,7 @@
 use quote::ToTokens;
 
 use crate::{
-    parser::{Result, Stmt},
+    parser::{Item, Result},
     tokenizer::Ident,
 };
 
@@ -10,6 +10,7 @@ mod c_code;
 
 mod context;
 mod expr;
+mod item;
 mod standard;
 mod stmt;
 mod ty;
@@ -17,14 +18,14 @@ mod value;
 
 pub use self::{c_code::CCode, context::Context, ty::*, value::*};
 
-pub fn run(stmts: Vec<Stmt>) -> Result<String> {
+pub fn run(items: Vec<Item>) -> Result<String> {
     let mut ctx = Context::base();
     let mut ctx = ctx.context();
     let ctx = &mut ctx;
     ctx.push_include("<stdio.h>");
     standard::generate(ctx)?;
-    for stmt in &stmts {
-        let code = stmt.generate(ctx)?;
+    for item in &items {
+        let code = item.generate(ctx)?;
         ctx.push_main(code);
     }
     ctx.push_main(c_code! { annabella_Main_(); });
@@ -91,82 +92,82 @@ impl ExprValue {
         }
     }
 
-    fn as_slice(&self) -> &[SingleExprValue] {
-        match self {
-            Self::Distinct(value) => std::slice::from_ref(value),
-            Self::Ambiguous(values) => values,
-        }
-    }
+    // fn as_slice(&self) -> &[SingleExprValue] {
+    //     match self {
+    //         Self::Distinct(value) => std::slice::from_ref(value),
+    //         Self::Ambiguous(values) => values,
+    //     }
+    // }
 
-    fn iter(&self) -> impl Iterator<Item = &SingleExprValue> {
-        self.as_slice().iter()
-    }
+    // fn iter(&self) -> impl Iterator<Item = &SingleExprValue> {
+    //     self.as_slice().iter()
+    // }
 
-    fn all_combinations(
-        list: Vec<Self>,
-        mut f: impl FnMut(&[&SingleExprValue]) -> Result<Self>,
-    ) -> Result<Self> {
-        if list.iter().all(|item| matches!(*item, Self::Ambiguous(_))) {
-            let current: Vec<_> = list
-                .iter()
-                .map(|item| match item {
-                    Self::Distinct(value) => value,
-                    Self::Ambiguous(_) => unreachable!(),
-                })
-                .collect();
-            return f(&current);
-        }
+    // fn all_combinations(
+    //     list: Vec<Self>,
+    //     mut f: impl FnMut(&[&SingleExprValue]) -> Result<Self>,
+    // ) -> Result<Self> {
+    //     if list.iter().all(|item| matches!(*item, Self::Ambiguous(_))) {
+    //         let current: Vec<_> = list
+    //             .iter()
+    //             .map(|item| match item {
+    //                 Self::Distinct(value) => value,
+    //                 Self::Ambiguous(_) => unreachable!(),
+    //             })
+    //             .collect();
+    //         return f(&current);
+    //     }
 
-        struct ResettableIter<'a, T> {
-            values: &'a [T],
-            index: usize,
-        }
+    //     struct ResettableIter<'a, T> {
+    //         values: &'a [T],
+    //         index: usize,
+    //     }
 
-        impl<'a, T> ResettableIter<'a, T> {
-            fn next(&mut self) -> Option<&'a T> {
-                let value = self.values.get(self.index)?;
-                self.index += 1;
-                Some(value)
-            }
+    //     impl<'a, T> ResettableIter<'a, T> {
+    //         fn next(&mut self) -> Option<&'a T> {
+    //             let value = self.values.get(self.index)?;
+    //             self.index += 1;
+    //             Some(value)
+    //         }
 
-            fn reset(&mut self) -> &'a T {
-                self.index = 0;
-                self.next().unwrap()
-            }
-        }
+    //         fn reset(&mut self) -> &'a T {
+    //             self.index = 0;
+    //             self.next().unwrap()
+    //         }
+    //     }
 
-        let mut iters: Vec<_> = list
-            .iter()
-            .map(|item| ResettableIter {
-                values: item.as_slice(),
-                index: 0,
-            })
-            .collect();
-        let mut current: Vec<_> = iters.iter_mut().map(|iter| iter.next().unwrap()).collect();
+    //     let mut iters: Vec<_> = list
+    //         .iter()
+    //         .map(|item| ResettableIter {
+    //             values: item.as_slice(),
+    //             index: 0,
+    //         })
+    //         .collect();
+    //     let mut current: Vec<_> = iters.iter_mut().map(|iter| iter.next().unwrap()).collect();
 
-        let mut last_err = None;
-        let mut new_values = Vec::new();
-        'outer: loop {
-            match f(&current) {
-                Ok(Self::Distinct(value)) => new_values.push(value),
-                Ok(Self::Ambiguous(values)) => new_values.extend(values),
-                Err(err) => {
-                    last_err = Some(err);
-                }
-            }
+    //     let mut last_err = None;
+    //     let mut new_values = Vec::new();
+    //     'outer: loop {
+    //         match f(&current) {
+    //             Ok(Self::Distinct(value)) => new_values.push(value),
+    //             Ok(Self::Ambiguous(values)) => new_values.extend(values),
+    //             Err(err) => {
+    //                 last_err = Some(err);
+    //             }
+    //         }
 
-            for (iter, value) in std::iter::zip(&mut iters, &mut current) {
-                if let Some(v) = iter.next() {
-                    *value = v;
-                    continue 'outer;
-                } else {
-                    *value = iter.reset();
-                }
-            }
-            break;
-        }
-        Self::new(new_values).ok_or_else(|| last_err.unwrap())
-    }
+    //         for (iter, value) in std::iter::zip(&mut iters, &mut current) {
+    //             if let Some(v) = iter.next() {
+    //                 *value = v;
+    //                 continue 'outer;
+    //             } else {
+    //                 *value = iter.reset();
+    //             }
+    //         }
+    //         break;
+    //     }
+    //     Self::new(new_values).ok_or_else(|| last_err.unwrap())
+    // }
 }
 
 impl From<SingleExprValue> for ExprValue {

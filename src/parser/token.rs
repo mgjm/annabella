@@ -288,6 +288,18 @@ macro_rules! Token {
     };
 }
 
+pub trait TokenFn: Copy {
+    type Token: Token;
+}
+
+impl<F, T> TokenFn for F
+where
+    F: Fn(Span) -> T + Copy,
+    T: Token,
+{
+    type Token = T;
+}
+
 pub trait Token: Parse {
     const DISPLAY: &'static str;
 

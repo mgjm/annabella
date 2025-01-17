@@ -65,10 +65,15 @@ end;
 --    d := Day'Pred(Wtf);
 
 procedure Main is
+   i: Integer;
 begin
    "Start";
    "Hello \n World""";
    'x';
+   i := 123;
+   i;
+   i := 42;
+   i;
    FooBar;
    Test(Test, Test);
    1 + 2 * 5 / 2 > 1 or 5 > 2;

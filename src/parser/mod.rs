@@ -9,14 +9,16 @@ use crate::{
 mod macros;
 
 mod expr;
+mod item;
 mod parenthesized;
 mod stmt;
 pub mod token;
 
 pub use expr::*;
+pub use item::*;
 pub use parenthesized::*;
 pub use stmt::*;
-use token::Token;
+use token::{Token, TokenFn};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -184,7 +186,7 @@ impl ParseBuffer<'_> {
         self.inner.is_empty()
     }
 
-    fn peek<T>(&self, _token: impl FnOnce(Span) -> T) -> bool
+    fn peek<T>(&self, _token: impl TokenFn<Token = T>) -> bool
     where
         T: Token,
     {
@@ -233,17 +235,26 @@ impl ParseBuffer<'_> {
         result
     }
 
-    fn parse_until_end<T>(&mut self) -> Result<Vec<T>>
+    fn parse_until<T, F>(&mut self, token: F) -> Result<(Vec<T>, F::Token)>
     where
         T: Parse,
+        F: TokenFn,
     {
-        self.call(|input| {
+        let value = self.call(|input| {
             let mut vec = Vec::new();
-            while !input.peek(Token![end]) {
+            while !input.peek(token) {
                 vec.push(input.parse()?);
             }
             Ok(vec)
-        })
+        })?;
+        Ok((value, self.parse()?))
+    }
+
+    fn parse_until_end<T>(&mut self) -> Result<(Vec<T>, Token![end])>
+    where
+        T: Parse,
+    {
+        self.parse_until(Token![end])
     }
 }
 

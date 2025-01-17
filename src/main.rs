@@ -1,8 +1,7 @@
 use std::{env, fs, path::PathBuf};
 
 use annabella_rs::{
-    codegen,
-    parser::{self, Stmt},
+    codegen, parser,
     tokenizer::{Span, TokenStream},
 };
 use anyhow::{Context, Result};
@@ -17,12 +16,12 @@ fn main() -> Result<()> {
         Err(annabella_rs::tokenizer::Error::InvalidSyntax(span, msg)) => show_error(span, &msg)?,
     };
 
-    let stmts: Vec<Stmt> = match parser::parse(input) {
-        Ok(stmt) => stmt,
+    let items = match parser::parse(input) {
+        Ok(items) => items,
         Err(parser::Error { span, msg, .. }) => show_error(span, &msg)?,
     };
 
-    let code = match codegen::run(stmts) {
+    let code = match codegen::run(items) {
         Ok(code) => code,
         Err(parser::Error { span, msg, .. }) => show_error(span, &msg)?,
     };

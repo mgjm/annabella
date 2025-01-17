@@ -1,5 +1,3 @@
-use quote::format_ident;
-
 use crate::{
     parser::{
         BaseName, BinaryOp, Expr, ExprBinary, ExprLit, FunctionCall, LitChar, LitNumber, LitStr,
@@ -8,7 +6,7 @@ use crate::{
     tokenizer::{Ident, Span, Spanned},
 };
 
-use super::{CCode, CodeGenExpr, Context, ExprValue, SingleExprValue, Type, Value};
+use super::{CCode, CodeGenExpr, Context, ExprValue, SingleExprValue, Type};
 
 impl CodeGenExpr for Expr {
     #[expect(unused_variables)]
