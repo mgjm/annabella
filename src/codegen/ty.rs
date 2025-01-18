@@ -1,4 +1,4 @@
-use std::{fmt, iter, ptr, rc::Rc};
+use std::{fmt, ptr, rc::Rc};
 
 use quote::ToTokens;
 
@@ -60,6 +60,10 @@ impl Type {
         Self::new(Inner::Enum(ty))
     }
 
+    pub fn signed(ty: SignedType) -> Self {
+        Self::new(Inner::Signed(ty))
+    }
+
     pub fn subtype(ty: SubtypeType) -> Self {
         Self::new(Inner::Subtype(ty))
     }
@@ -100,20 +104,23 @@ impl Type {
             Inner::String => "String",
             Inner::Function(ty) => ty.to_str(),
             Inner::Enum(ty) => ty.to_str(),
+            Inner::Signed(ty) => ty.to_str(),
             Inner::Subtype(ty) => ty.to_str(),
         }
     }
 
-    pub fn has_same_parent(&self, other: &Self) -> bool {
+    /// Is it allowed to assign a `source` value to `self`?
+    pub fn can_assign(&self, source: &Self) -> bool {
         match self.inner() {
-            Inner::Void => matches!(other.inner(), Inner::Void),
-            Inner::Boolean => matches!(other.inner(), Inner::Boolean),
-            Inner::Character => matches!(other.inner(), Inner::Character),
-            Inner::Integer => matches!(other.inner(), Inner::Integer),
-            Inner::String => matches!(other.inner(), Inner::String),
-            Inner::Function(ty) => ty.has_same_parent(other),
-            Inner::Enum(ty) => ty.has_same_parent(other),
-            Inner::Subtype(ty) => ty.has_same_parent(other),
+            Inner::Void => matches!(source.inner(), Inner::Void),
+            Inner::Boolean => matches!(source.inner(), Inner::Boolean),
+            Inner::Character => matches!(source.inner(), Inner::Character),
+            Inner::Integer => matches!(source.inner(), Inner::Integer),
+            Inner::String => matches!(source.inner(), Inner::String),
+            Inner::Function(ty) => ty.can_assign(source),
+            Inner::Enum(ty) => ty.can_assign(source),
+            Inner::Signed(ty) => ty.can_assign(source),
+            Inner::Subtype(ty) => ty.can_assign(source),
         }
     }
 
@@ -127,6 +134,7 @@ impl Type {
             Inner::String => None,
             Inner::Function(ty) => ty.needs_constraint_check(source),
             Inner::Enum(ty) => ty.needs_constraint_check(source),
+            Inner::Signed(ty) => ty.needs_constraint_check(source),
             Inner::Subtype(ty) => ty.needs_constraint_check(source),
         }
     }
@@ -143,6 +151,7 @@ impl ToTokens for Type {
             Inner::String => new_ident().to_tokens(tokens),
             Inner::Function(_) => new_ident().to_tokens(tokens),
             Inner::Enum(ty) => ty.ident.to_tokens(tokens),
+            Inner::Signed(ty) => ty.ident.to_tokens(tokens),
             Inner::Subtype(ty) => ty.parent().to_tokens(tokens),
         }
     }
@@ -157,12 +166,13 @@ pub enum Inner {
     String,
     Function(FunctionType),
     Enum(EnumType),
+    Signed(SignedType),
     Subtype(SubtypeType),
 }
 
 trait TypeImpl: fmt::Debug {
     fn to_str(&self) -> &str;
-    fn has_same_parent(&self, other: &Type) -> bool;
+    fn can_assign(&self, source: &Type) -> bool;
     fn needs_constraint_check(&self, source: &Type) -> Option<&CCode>;
 }
 
@@ -177,14 +187,12 @@ impl TypeImpl for FunctionType {
         "Function"
     }
 
-    fn has_same_parent(&self, other: &Type) -> bool {
-        let Some(other) = other.as_function() else {
+    fn can_assign(&self, source: &Type) -> bool {
+        let Some(source) = source.as_function() else {
             return false;
         };
 
-        self.args.len() == other.args.len()
-            && iter::zip(&self.args, &other.args).all(|(a, b)| a.has_same_parent(b))
-            && self.return_type.has_same_parent(&other.return_type)
+        ptr::eq(self, source)
     }
 
     fn needs_constraint_check(&self, _target: &Type) -> Option<&CCode> {
@@ -192,7 +200,7 @@ impl TypeImpl for FunctionType {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct EnumType {
     pub name: Ident,
     pub ident: proc_macro2::Ident,
@@ -204,20 +212,55 @@ impl TypeImpl for EnumType {
         &self.name.name
     }
 
-    fn has_same_parent(&self, mut other: &Type) -> bool {
-        let other = loop {
-            other = match other.inner() {
+    fn can_assign(&self, mut source: &Type) -> bool {
+        let source = loop {
+            source = match source.inner() {
                 Inner::Subtype(ty) => &ty.parent,
                 Inner::Enum(ty) => break ty,
                 _ => return false,
             };
         };
 
-        self == other
+        ptr::eq(self, source)
     }
 
     fn needs_constraint_check(&self, _target: &Type) -> Option<&CCode> {
         None
+    }
+}
+
+#[derive(Debug)]
+pub struct SignedType {
+    pub name: Ident,
+    pub ident: proc_macro2::Ident,
+    pub constraint_check: Option<CCode>,
+}
+
+impl TypeImpl for SignedType {
+    fn to_str(&self) -> &str {
+        &self.name.name
+    }
+
+    fn can_assign(&self, mut source: &Type) -> bool {
+        let source = loop {
+            source = match source.inner() {
+                Inner::Integer => return true,
+                Inner::Subtype(ty) => &ty.parent,
+                Inner::Signed(ty) => break ty,
+                _ => return false,
+            };
+        };
+
+        ptr::eq(self, source)
+    }
+
+    fn needs_constraint_check(&self, source: &Type) -> Option<&CCode> {
+        if let Inner::Signed(source) = source.inner() {
+            if ptr::eq(self, source) {
+                return None;
+            }
+        }
+        self.constraint_check.as_ref()
     }
 }
 
@@ -242,8 +285,8 @@ impl TypeImpl for SubtypeType {
         self.parent().to_str()
     }
 
-    fn has_same_parent(&self, other: &Type) -> bool {
-        self.parent().has_same_parent(other)
+    fn can_assign(&self, source: &Type) -> bool {
+        self.parent().can_assign(source)
     }
 
     fn needs_constraint_check(&self, source: &Type) -> Option<&CCode> {

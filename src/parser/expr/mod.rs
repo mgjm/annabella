@@ -294,9 +294,39 @@ parse! {
 impl LitNumber {
     pub fn number<T>(&self) -> T
     where
-        T: std::str::FromStr,
+        T: ParseNumber,
     {
-        self.lit.str.parse().ok().unwrap()
+        T::parse(&self.lit.str)
+    }
+}
+
+pub trait ParseNumber: Sized {
+    fn parse(s: &str) -> Self;
+}
+
+impl ParseNumber for i64 {
+    fn parse(s: &str) -> Self {
+        let mut n = 0;
+        let (s, neg) = if let Some(s) = s.strip_prefix('-') {
+            (s, true)
+        } else {
+            (s, false)
+        };
+        for c in s.bytes() {
+            match c {
+                b'_' => continue,
+                b'0'..=b'9' => {
+                    n *= 10;
+                    n += i64::from(c - b'0');
+                }
+                _ => unreachable!("invalid char in number: {}", c as char),
+            }
+        }
+        if neg {
+            -n
+        } else {
+            n
+        }
     }
 }
 

@@ -170,12 +170,19 @@ impl Parse for FullTypeItem {
 parse!({
     enum TypeDefinition {
         Enum(EnumTypeDefinition),
+        Signed(SignedTypeDefinition),
     }
 });
 
 impl Parse for TypeDefinition {
     fn parse(input: ParseStream) -> Result<Self> {
-        Ok(Self::Enum(input.parse()?))
+        Ok(if let Some(td) = input.try_parse()? {
+            Self::Signed(td)
+        } else if let Some(td) = input.try_parse()? {
+            Self::Enum(td)
+        } else {
+            return Err(input.recoverable_error("expected type definition"));
+        })
     }
 }
 
@@ -189,6 +196,25 @@ impl Parse for EnumTypeDefinition {
     fn parse(input: ParseStream) -> Result<Self> {
         Ok(Self {
             values: input.parse()?,
+        })
+    }
+}
+
+parse!({
+    struct SignedTypeDefinition {
+        range_keyword: Token![range],
+        range: Range,
+    }
+});
+
+impl Parse for SignedTypeDefinition {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let range_keyword = input.parse()?;
+        input.unrecoverable(|input| {
+            Ok(Self {
+                range_keyword,
+                range: input.parse()?,
+            })
         })
     }
 }

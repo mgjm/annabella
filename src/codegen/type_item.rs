@@ -1,15 +1,15 @@
 use crate::{
     parser::{
-        Constraint, EnumTypeDefinition, FullTypeItem, RangeConstraint, SubtypeItem, TypeDefinition,
-        TypeItem,
+        Constraint, EnumTypeDefinition, FullTypeItem, RangeConstraint, SignedTypeDefinition,
+        SubtypeItem, TypeDefinition, TypeItem,
     },
     tokenizer::Ident,
     Result,
 };
 
 use super::{
-    standard, CCode, CodeGenExpr, CodeGenStmt, Context, EnumType, FunctionType, FunctionValue,
-    IdentBuilder, SubtypeType, Type, TypeValue, Value,
+    standard, CCode, CodeGenExpr, CodeGenStmt, CodeGenType, Context, EnumType, FunctionType,
+    FunctionValue, IdentBuilder, SignedType, SubtypeType, Type, TypeValue, Value,
 };
 
 impl CodeGenStmt for TypeItem {
@@ -26,14 +26,11 @@ impl CodeGenStmt for FullTypeItem {
     }
 }
 
-trait CodeGenType {
-    fn generate(&self, name: &Ident, ctx: &mut Context) -> Result<CCode>;
-}
-
 impl CodeGenType for TypeDefinition {
     fn generate(&self, name: &Ident, ctx: &mut Context) -> Result<CCode> {
         match self {
             TypeDefinition::Enum(definition) => definition.generate(name, ctx),
+            TypeDefinition::Signed(definition) => definition.generate(name, ctx),
         }
     }
 }
@@ -83,6 +80,45 @@ impl CodeGenType for EnumTypeDefinition {
             },
             ctx,
         )?;
+
+        Ok(c_code!())
+    }
+}
+
+impl CodeGenType for SignedTypeDefinition {
+    fn generate(&self, name: &Ident, ctx: &mut Context) -> Result<CCode> {
+        let ident = IdentBuilder::type_(name);
+
+        ctx.push_type(c_code! {
+            typedef ssize_t #ident;
+        });
+
+        let constraint_check = {
+            let constraint = RangeConstraint {
+                range_token: self.range_keyword,
+                range: self.range.clone(),
+            }
+            .generate(&Type::integer(), ctx)?;
+            let constraint_ident = IdentBuilder::constraint_check(name);
+            ctx.push_function(c_code! {
+                #ident #constraint_ident (#ident self) {
+                    #constraint
+                    return self;
+                }
+            });
+            Some(c_code! { #constraint_ident})
+        };
+
+        let ty = Type::signed(SignedType {
+            name: name.clone(),
+            ident: ident.clone(),
+            constraint_check,
+        });
+
+        ctx.insert(name, Value::Type(TypeValue { ty: ty.clone() }))?;
+
+        standard::generate_signed_ops(&ty, ctx)?;
+        standard::generate_print(ty, "%ld", ctx)?;
 
         Ok(c_code!())
     }

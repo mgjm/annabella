@@ -53,6 +53,10 @@ trait CodeGenStmt {
     fn generate(&self, ctx: &mut Context) -> Result<CCode>;
 }
 
+trait CodeGenType {
+    fn generate(&self, name: &Ident, ctx: &mut Context) -> Result<CCode>;
+}
+
 enum ExprValue {
     Distinct(SingleExprValue),
     Ambiguous(Vec<SingleExprValue>),
@@ -213,10 +217,7 @@ trait CodeGenExpr: Spanned {
     fn generate(&self, ctx: &mut Context) -> Result<ExprValue>;
 
     fn generate_with_type_and_check(&self, ty: &Type, ctx: &mut Context) -> Result<CCode> {
-        let expr = match self
-            .generate(ctx)?
-            .filter(|value| value.ty.has_same_parent(ty))
-        {
+        let expr = match self.generate(ctx)?.filter(|value| ty.can_assign(&value.ty)) {
             Some(ExprValue::Distinct(expr)) => expr,
             Some(ExprValue::Ambiguous(_)) => {
                 return Err(self.unrecoverable_error("ambiguous expression"));

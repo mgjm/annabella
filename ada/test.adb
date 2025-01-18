@@ -25,7 +25,7 @@ end;
 procedure Test (foo: Integer; bar: String) is
 begin
    Print("Test2:");
-   Print(foo * 1000);
+   Print(foo);
    Print(bar);
    Print("end Test2");
 end;
@@ -42,11 +42,8 @@ end;
 --    foo;
 -- end Test;
 
--- subtype Meter is Integer range 0 .. Integer'Last;
--- subtype Inch is Integer range 0 .. 123;
-
--- type Meter is range 0 .. 125;
--- type Inch is range 0 .. Integer'Last;
+type Meter is range 0 .. 1_000_000;
+type Inch is range 0 .. 123;
 
 -- function "+"(lhs: Meter; rhs: Meter) return Meter is
 -- begin
@@ -80,17 +77,14 @@ type Day is (Mon, Tue, Wed, Thu, Fri, Sat, Sun);
 subtype Weekday is Day range Mon .. Fri;
 
 procedure Main is
-   i: Integer;
    d: Day;
    wd: Weekday;
+   m: Meter;
+   i: Inch;
 begin
    Print("Start");
    Print("Hello \n World""");
    Print('x');
-   i := 123;
-   Print(i);
-   i := Test;
-   Print(i);
    d := Sat;
    Print(d);
    wd := Thu;
@@ -102,7 +96,16 @@ begin
    Test;
    FooBar;
    Test(Test, Test);
-   Print(1 + 2 * 5 / 2 > 1 or 5 > 2);
+   -- Print(1 + 2 * 5 / 2 > 1 or 5 > 2);
    Print(ReturnCheck);
+
+   m := 5;
+   m := m + 3;
+   Print(m);
+
+   i := 3;
+   i := i + 120;
+   Print(i);
+   
    Print("End");
 end;
