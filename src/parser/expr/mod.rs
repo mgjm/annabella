@@ -1,9 +1,9 @@
 use crate::{
     tokenizer::{Ident, Literal, Span, Spanned},
-    Token,
+    Result, Token,
 };
 
-use super::{Parenthesized, Parse, ParseStream, Result};
+use super::{Parenthesized, Parse, ParseStream};
 
 parse! {
     enum Expr {
@@ -118,7 +118,7 @@ impl Expr {
         }))
     }
 
-    fn parse_simple_expression(input: ParseStream) -> Result<Self> {
+    pub(super) fn parse_simple_expression(input: ParseStream) -> Result<Self> {
         #[allow(clippy::manual_map)]
         let op = if let Some(op) = input.try_parse()? {
             Some(UnaryOp::Add(op))

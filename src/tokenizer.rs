@@ -1,5 +1,4 @@
 use std::{
-    borrow::Cow,
     fmt::{self, Write},
     ops::Deref,
     path::PathBuf,
@@ -8,14 +7,10 @@ use std::{
 
 mod span;
 
+use crate::Result;
+
 use self::span::SpanOffset;
 pub use self::span::{Span, Spanned};
-
-pub type Result<T> = std::result::Result<T, Error>;
-
-pub enum Error {
-    InvalidSyntax(Span, Cow<'static, str>),
-}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TokenStream {
@@ -55,10 +50,7 @@ impl TokenStream {
             let start = input.offset;
             let Some(first) = input.chars().next() else {
                 return if let Some(&(start, ..)) = stack.last() {
-                    Err(Error::InvalidSyntax(
-                        Span::new(start, start),
-                        "unclosed groups remaining".into(),
-                    ))
+                    Err(Span::new(start, start).unrecoverable_error("unclosed groups remaining"))
                 } else {
                     Ok(Self {
                         inner: trees.into(),
@@ -68,12 +60,7 @@ impl TokenStream {
 
             if let Some(delimiter) = match first {
                 '(' => Some(Delimiter::Parenthesis),
-                '[' | '{' => {
-                    return Err(Error::InvalidSyntax(
-                        input.span(),
-                        "only parenthesis allowed".into(),
-                    ))
-                }
+                '[' | '{' => return Err(input.unrecoverable_error("only parenthesis allowed")),
                 _ => None,
             } {
                 input = input.advance(1);
@@ -84,16 +71,13 @@ impl TokenStream {
                 _ => None,
             } {
                 let Some((start, open, outer)) = stack.pop() else {
-                    return Err(Error::InvalidSyntax(
-                        input.span(),
-                        "missing open delimiter".into(),
-                    ));
+                    return Err(input.unrecoverable_error("missing open delimiter"));
                 };
                 if open != close {
-                    return Err(Error::InvalidSyntax(
-                        input.span(),
-                        format!("delimiter does not match: expected `{}``", open.close()).into(),
-                    ));
+                    return Err(input.unrecoverable_error(format!(
+                        "delimiter does not match: expected `{}``",
+                        open.close()
+                    )));
                 }
                 input = input.advance(1);
                 let group = Group {
@@ -171,10 +155,7 @@ impl TokenTree {
             } else if let Some((punct, input)) = Punct::parse(input.clone())? {
                 (Self::Punct(punct), input)
             } else {
-                return Err(Error::InvalidSyntax(
-                    input.span(),
-                    "unparsable token".into(),
-                ));
+                return Err(input.unrecoverable_error("unparsable token"));
             },
         )
     }
@@ -236,7 +217,9 @@ impl Cursor<'_> {
         };
         self.advance(bytes)
     }
+}
 
+impl Spanned for Cursor<'_> {
     fn span(&self) -> Span {
         Span::new(self.offset, self.offset)
     }
@@ -525,29 +508,24 @@ impl Literal {
                         if let Some((_, c)) = chars.next() {
                             if let Some((_, '\'')) = chars.next() {
                                 if !Self::is_extended_graphic_character(c) {
-                                    return Err(Error::InvalidSyntax(
-                                        input.advance(1).span(),
-                                        "expected graphic_character".into(),
-                                    ));
+                                    return Err(input
+                                        .advance(1)
+                                        .unrecoverable_error("expected graphic_character"));
                                 }
                                 return Ok(None);
                             }
                         };
                     }
                     if !Self::is_extended_graphic_character(c) {
-                        return Err(Error::InvalidSyntax(
-                            input.advance(1).span(),
-                            "expected graphic_character".into(),
-                        ));
+                        return Err(input
+                            .advance(1)
+                            .unrecoverable_error("expected graphic_character"));
                     }
                     input.advance(end + 1)
                 }
                 '"' => loop {
                     let Some((i, char)) = chars.next() else {
-                        return Err(Error::InvalidSyntax(
-                            input.span(),
-                            "unterminated string literal".into(),
-                        ));
+                        return Err(input.unrecoverable_error("unterminated string literal"));
                     };
                     if char == '"' {
                         if matches!(chars.next(), Some((_, '"'))) {
@@ -568,16 +546,14 @@ impl Literal {
                                 input
                             };
                             let Some(('#', input)) = input.clone().advance_char() else {
-                                return Err(Error::InvalidSyntax(
-                                    input.span(),
-                                    "expected second `#` delimiter in based number literal".into(),
+                                return Err(input.unrecoverable_error(
+                                    "expected second `#` delimiter in based number literal",
                                 ));
                             };
                             match input.clone().advance_char() {
                                 Some(('+' | '-' | '0'..='9', _)) => {
-                                    return Err(Error::InvalidSyntax(
-                                        input.span(),
-                                        "based literal with exponent not implemented".into(),
+                                    return Err(input.unrecoverable_error(
+                                        "based literal with exponent not implemented",
                                     ))
                                 }
                                 _ => input,
@@ -654,7 +630,7 @@ impl Literal {
         let span = input.span();
         let input = match input.advance_char() {
             Some((char, input)) if char.is_ascii_digit() => input,
-            _ => return Err(Error::InvalidSyntax(span, "expected digit".into())),
+            _ => return Err(span.unrecoverable_error("expected digit")),
         };
         Self::consume_rest_of_numeral(input)
     }
@@ -681,7 +657,7 @@ impl Literal {
         let span = input.span();
         let mut input = match input.advance_char() {
             Some((char, input)) if char.is_ascii_hexdigit() => input,
-            _ => return Err(Error::InvalidSyntax(span, "expected hex digit".into())),
+            _ => return Err(span.unrecoverable_error("expected hex digit")),
         };
 
         Ok(loop {

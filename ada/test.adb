@@ -76,8 +76,8 @@ end;
 --    d := Day'Pred(Wtf);
 
 type Day is (Mon, Tue, Wed, Thu, Fri, Sat, Sun);
-type Weekday is (Mon, Tue, Wed, Thu, Fri);
--- subtype Weekday is Day range Mon .. Fri;
+-- type Weekday is (Mon, Tue, Wed, Thu, Fri);
+subtype Weekday is Day range Mon .. Fri;
 
 procedure Main is
    i: Integer;
@@ -95,6 +95,10 @@ begin
    Print(d);
    wd := Thu;
    Print(wd);
+   wd := d;
+   Print(d);
+   d := wd;
+   Print(d);
    Test;
    FooBar;
    Test(Test, Test);

@@ -1,4 +1,7 @@
-use crate::parser::{Function, Item, Result, Variable};
+use crate::{
+    parser::{Function, Item, Variable},
+    Result,
+};
 
 use super::{CCode, CodeGenStmt, Context, FunctionType, FunctionValue, Type, Value, VariableValue};
 
@@ -7,6 +10,7 @@ impl CodeGenStmt for Item {
         match self {
             Self::Function(item) => item.generate(ctx),
             Self::Type(item) => item.generate(ctx),
+            Self::Subtype(item) => item.generate(ctx),
             Self::Variable(item) => item.generate(ctx),
         }
     }
@@ -97,7 +101,7 @@ impl CodeGenStmt for Function {
             &self.name,
             Value::Function(FunctionValue::new(
                 name,
-                Type::Function(FunctionType { args, return_type }).into(),
+                Type::function(FunctionType { args, return_type }),
             )),
         )?;
         Ok(c_code!())
@@ -112,10 +116,9 @@ impl CodeGenStmt for Variable {
             name,
             Value::Variable(VariableValue {
                 name: c_code! { #name },
-                ty,
+                ty: ty.clone(),
             }),
         )?;
-        let ty = &self.ty;
         Ok(c_code! {
             #ty #name;
         })

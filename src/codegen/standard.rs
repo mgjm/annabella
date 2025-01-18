@@ -1,11 +1,10 @@
 use crate::{
     codegen::TypeValue,
-    parser::Result,
     tokenizer::{Ident, Span},
-    Token,
+    Result, Token,
 };
 
-use super::{CCode, Context, FunctionType, FunctionValue, RcType, Type, Value};
+use super::{CCode, Context, FunctionType, FunctionValue, Type, Value};
 
 pub fn generate(ctx: &mut Context) -> Result<()> {
     ctx.push_type(c_code! {
@@ -29,11 +28,10 @@ pub fn generate(ctx: &mut Context) -> Result<()> {
                     &op.operator_symbol(),
                     Value::Function(FunctionValue::new(
                          c_code! { #ident },
-                         Type::Function(FunctionType {
-                            args: vec![Type::Integer.into(), Type::Integer.into()],
-                            return_type: Type::Integer.into(),
+                         Type::function(FunctionType {
+                            args: vec![Type::integer(), Type::integer()],
+                            return_type: Type::integer(),
                         })
-                        .into(),
                     )),
                 )?;
 
@@ -58,11 +56,10 @@ pub fn generate(ctx: &mut Context) -> Result<()> {
     }
 
     for (ty, fmt) in [
-        (Type::Integer, "%d"),
-        (Type::String, "%s"),
-        (Type::Character, "%c"),
+        (Type::integer(), "%d"),
+        (Type::string(), "%s"),
+        (Type::character(), "%c"),
     ] {
-        let ty: RcType = ty.into();
         let ident = Ident {
             name: ty.to_str().into(),
             span: Span::call_site(),
@@ -80,7 +77,7 @@ pub fn generate(ctx: &mut Context) -> Result<()> {
     Ok(())
 }
 
-pub fn generate_print(ty: RcType, fmt: &'static str, ctx: &mut Context) -> Result<()> {
+pub fn generate_print(ty: Type, fmt: &'static str, ctx: &mut Context) -> Result<()> {
     generate_custom_print(
         ty,
         c_code! {
@@ -90,7 +87,7 @@ pub fn generate_print(ty: RcType, fmt: &'static str, ctx: &mut Context) -> Resul
     )
 }
 
-pub fn generate_custom_print(ty: RcType, code: CCode, ctx: &mut Context) -> Result<()> {
+pub fn generate_custom_print(ty: Type, code: CCode, ctx: &mut Context) -> Result<()> {
     let print = Ident {
         name: "Print".into(),
         span: Span::call_site(),
@@ -108,11 +105,10 @@ pub fn generate_custom_print(ty: RcType, code: CCode, ctx: &mut Context) -> Resu
         &print,
         Value::Function(FunctionValue::new(
             c_code! { #ident },
-            Type::Function(FunctionType {
+            Type::function(FunctionType {
                 args: vec![ty],
-                return_type: Type::Void.into(),
-            })
-            .into(),
+                return_type: Type::void(),
+            }),
         )),
     )?;
 

@@ -1,6 +1,7 @@
 use crate::{
-    parser::{AssignStmt, ExprStmt, Result, ReturnStmt, Stmt},
+    parser::{AssignStmt, ExprStmt, ReturnStmt, Stmt},
     tokenizer::Spanned,
+    Result,
 };
 
 use super::{CCode, CodeGenExpr, CodeGenStmt, Context, ExprValue, SingleExprValue, Type};
@@ -17,11 +18,7 @@ impl CodeGenStmt for Stmt {
 
 impl CodeGenStmt for ExprStmt {
     fn generate(&self, ctx: &mut Context) -> Result<CCode> {
-        let expr = match self
-            .expr
-            .generate(ctx)?
-            .filter(|value| *value.ty == Type::Void)
-        {
+        let expr = match self.expr.generate(ctx)?.filter(|value| value.ty.is_void()) {
             Some(ExprValue::Distinct(expr)) => expr,
             Some(ExprValue::Ambiguous(_)) => {
                 return Err(self.expr.unrecoverable_error("ambiguous expression"));
@@ -47,7 +44,7 @@ impl CodeGenStmt for ReturnStmt {
         let expr = match self
             .expr
             .generate(ctx)?
-            .filter(|value| *value.ty == *return_type)
+            .filter(|value| value.ty.has_same_parent(&return_type))
         {
             Some(ExprValue::Distinct(expr)) => expr,
             Some(ExprValue::Ambiguous(_)) => {
@@ -70,7 +67,7 @@ impl CodeGenStmt for AssignStmt {
             let expr = match self
                 .expr
                 .generate(ctx)?
-                .filter(|value| *value.ty == *name.ty)
+                .filter(|value| value.ty.has_same_parent(&name.ty))
             {
                 Some(ExprValue::Distinct(expr)) => expr,
                 Some(ExprValue::Ambiguous(_)) => {
@@ -85,6 +82,7 @@ impl CodeGenStmt for AssignStmt {
                 code: c_code! {
                     #name = #expr;
                 },
+                value: None,
             }
             .into())
         })?;

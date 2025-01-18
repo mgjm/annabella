@@ -3,7 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use super::{CCode, RcType, Scope};
+use super::{CCode, Scope, Type};
 
 pub struct Base {
     inner: Inner,
@@ -22,7 +22,7 @@ impl Base {
 pub struct Context<'a> {
     inner: &'a mut Inner,
     scope: Scope<'a>,
-    return_type: Option<RcType>,
+    return_type: Option<Type>,
 }
 
 #[derive(Default)]
@@ -56,7 +56,7 @@ impl Context<'_> {
         self.inner.main.push(code);
     }
 
-    pub fn subscope(&mut self, return_type: Option<RcType>) -> Context {
+    pub fn subscope(&mut self, return_type: Option<Type>) -> Context {
         Context {
             inner: self.inner,
             scope: self.scope.subscope(),
@@ -64,7 +64,7 @@ impl Context<'_> {
         }
     }
 
-    pub fn return_type(&self) -> Option<RcType> {
+    pub fn return_type(&self) -> Option<Type> {
         self.return_type.clone()
     }
 }

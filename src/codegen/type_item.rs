@@ -1,11 +1,15 @@
 use crate::{
-    parser::{EnumTypeDefinition, FullTypeItem, Result, TypeDefinition, TypeItem},
+    parser::{
+        Constraint, EnumTypeDefinition, FullTypeItem, RangeConstraint, SubtypeItem, TypeDefinition,
+        TypeItem,
+    },
     tokenizer::Ident,
+    Result,
 };
 
 use super::{
-    standard, CCode, CodeGenStmt, Context, EnumType, FunctionType, FunctionValue, Type, TypeValue,
-    Value,
+    standard, CCode, CodeGenStmt, Context, EnumType, FunctionType, FunctionValue, SubtypeType,
+    Type, TypeValue, Value,
 };
 
 impl CodeGenStmt for TypeItem {
@@ -56,11 +60,10 @@ impl CodeGenType for EnumTypeDefinition {
                 value,
                 Value::Function(FunctionValue::new(
                     c_code! { #ident },
-                    Type::Function(FunctionType {
+                    Type::function(FunctionType {
                         args: vec![],
                         return_type: ty.clone(),
-                    })
-                    .into(),
+                    }),
                 )),
             )?;
         }
@@ -86,5 +89,45 @@ impl CodeGenType for EnumTypeDefinition {
         )?;
 
         Ok(c_code!())
+    }
+}
+
+impl CodeGenStmt for SubtypeItem {
+    fn generate(&self, ctx: &mut Context) -> Result<CCode> {
+        let name = &self.name;
+        let parent = Type::parse_ident(&self.mark, ctx)?;
+
+        let _constraint = self
+            .constraint
+            .as_ref()
+            .map(|constraint| constraint.generate(ctx))
+            .transpose()?;
+
+        let ty = Type::subtype(SubtypeType { parent });
+        let c_name = quote::format_ident!("{}", ty.to_str());
+        ctx.insert(
+            name,
+            Value::Type(TypeValue {
+                name: c_code! { #c_name},
+                ty,
+            }),
+        )?;
+
+        Ok(c_code!())
+    }
+}
+
+impl Constraint {
+    fn generate(&self, ctx: &mut Context) -> Result<CCode> {
+        match self {
+            Self::Range(constraint) => constraint.generate(ctx),
+        }
+    }
+}
+
+impl RangeConstraint {
+    fn generate(&self, ctx: &mut Context) -> Result<CCode> {
+        let _ = ctx;
+        Ok(c_code! {})
     }
 }

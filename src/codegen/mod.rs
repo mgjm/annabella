@@ -1,8 +1,9 @@
 use quote::ToTokens;
 
 use crate::{
-    parser::{Item, Result},
-    tokenizer::Ident,
+    parser::Item,
+    tokenizer::{Ident, Spanned},
+    Result,
 };
 
 #[macro_use]
@@ -177,9 +178,17 @@ impl From<SingleExprValue> for ExprValue {
     }
 }
 
+enum CompileTimeValue {
+    Character(char),
+    Boolean(bool),
+    Integer(i64),
+    String(String),
+}
+
 struct SingleExprValue {
-    ty: RcType,
+    ty: Type,
     code: CCode,
+    value: Option<CompileTimeValue>,
 }
 
 impl ToTokens for SingleExprValue {
@@ -188,9 +197,10 @@ impl ToTokens for SingleExprValue {
     }
 }
 
-trait CodeGenExpr {
+trait CodeGenExpr: Spanned {
     fn generate(&self, ctx: &mut Context) -> Result<ExprValue>;
 }
+
 impl ToTokens for Ident {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         proc_macro2::Ident::new(&self.name, proc_macro2::Span::call_site()).to_tokens(tokens)

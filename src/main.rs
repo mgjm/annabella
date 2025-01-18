@@ -1,9 +1,6 @@
 use std::{env, fs, path::PathBuf};
 
-use annabella_rs::{
-    codegen, parser,
-    tokenizer::{Span, TokenStream},
-};
+use annabella_rs::{codegen, parser, tokenizer::TokenStream, Error};
 use anyhow::{Context, Result};
 
 fn main() -> Result<()> {
@@ -11,26 +8,26 @@ fn main() -> Result<()> {
 
     let source = fs::read_to_string(&path).with_context(|| format!("read source: {path:?}"))?;
 
-    let input = match TokenStream::parse(&source, Some(path)) {
-        Ok(stream) => stream,
-        Err(annabella_rs::tokenizer::Error::InvalidSyntax(span, msg)) => show_error(span, &msg)?,
-    };
+    run(source, path).map_err(show_error)
+}
 
-    let items = match parser::parse(input) {
-        Ok(items) => items,
-        Err(parser::Error { span, msg, .. }) => show_error(span, &msg)?,
-    };
+fn run(source: String, path: PathBuf) -> Result<(), Error> {
+    let input = TokenStream::parse(&source, Some(path))?;
 
-    let code = match codegen::run(items) {
-        Ok(code) => code,
-        Err(parser::Error { span, msg, .. }) => show_error(span, &msg)?,
-    };
+    let items = parser::parse(input)?;
+
+    let code = codegen::run(items)?;
     println!("{code}");
 
     Ok(())
 }
 
-fn show_error<T>(span: Span, msg: &str) -> Result<T> {
+fn show_error(err: Error) -> anyhow::Error {
+    let Error {
+        span,
+        msg,
+        recoverable: _,
+    } = err;
     eprintln!(
         "{msg} in {:?}:",
         span.filepath().as_deref().unwrap_or("<call_site>".as_ref())
@@ -49,5 +46,5 @@ fn show_error<T>(span: Span, msg: &str) -> Result<T> {
             eprintln!("      {} {msg}", std::str::from_utf8(&marker).unwrap());
         }
     }
-    anyhow::bail!("transpiler failed");
+    anyhow::anyhow!("transpiler failed")
 }

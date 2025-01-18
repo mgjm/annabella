@@ -1,8 +1,6 @@
-use std::borrow::Cow;
-
 use crate::{
     tokenizer::{Group, Ident, Literal, Punct, Span, Spanned, TokenStream, TokenTree},
-    Token,
+    Result, Token,
 };
 
 #[macro_use]
@@ -20,34 +18,8 @@ pub use parenthesized::*;
 pub use stmt::*;
 use token::{Token, TokenFn};
 
-pub type Result<T> = std::result::Result<T, Error>;
-
-pub struct Error {
-    pub span: Span,
-    pub msg: Cow<'static, str>,
-    pub recoverable: bool,
-}
-
-impl Error {
-    pub fn recoverable(span: Span, msg: impl Into<Cow<'static, str>>) -> Self {
-        Self {
-            span,
-            msg: msg.into(),
-            recoverable: true,
-        }
-    }
-
-    pub fn unrecoverable(span: Span, msg: impl Into<Cow<'static, str>>) -> Self {
-        Self {
-            span,
-            msg: msg.into(),
-            recoverable: false,
-        }
-    }
-}
-
 pub trait Parse: Sized {
-    fn parse(input: ParseStream) -> Result<Self>;
+    fn parse(input: ParseStream) -> crate::Result<Self>;
 }
 
 fn is_keyword(ident: &Ident) -> bool {

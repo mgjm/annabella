@@ -1,11 +1,11 @@
 use std::collections::{btree_map::Entry, BTreeMap};
 
 use crate::{
-    parser::Result,
     tokenizer::{Ident, Spanned},
+    Result,
 };
 
-use super::{CCode, ExprValue, RcType, SingleExprValue};
+use super::{CCode, ExprValue, SingleExprValue, Type};
 
 #[derive(Debug, Default)]
 pub struct Scope<'a> {
@@ -73,7 +73,7 @@ pub struct FunctionValue {
 }
 
 impl FunctionValue {
-    pub fn new(name: CCode, ty: RcType) -> Self {
+    pub fn new(name: CCode, ty: Type) -> Self {
         Self {
             overloads: vec![FunctionOverload { name, ty }],
         }
@@ -89,6 +89,7 @@ impl FunctionValue {
         ExprValue::new(self.overloads.iter().map(|ol| SingleExprValue {
             ty: ol.ty.clone(),
             code: ol.name.clone(),
+            value: None,
         }))
         .unwrap()
     }
@@ -97,19 +98,19 @@ impl FunctionValue {
 #[derive(Debug)]
 struct FunctionOverload {
     pub name: CCode,
-    pub ty: RcType,
+    pub ty: Type,
 }
 
 #[derive(Debug)]
 pub struct TypeValue {
     pub name: CCode,
-    pub ty: RcType,
+    pub ty: Type,
 }
 
 #[derive(Debug)]
 pub struct VariableValue {
     pub name: CCode,
-    pub ty: RcType,
+    pub ty: Type,
 }
 
 impl VariableValue {
@@ -117,6 +118,7 @@ impl VariableValue {
         SingleExprValue {
             ty: self.ty.clone(),
             code: self.name.clone(),
+            value: None,
         }
         .into()
     }

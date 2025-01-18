@@ -1,12 +1,13 @@
 use crate::{
     parser::{
         BaseName, BinaryOp, Expr, ExprBinary, ExprLit, FunctionCall, LitChar, LitNumber, LitStr,
-        Name, Result,
+        Name,
     },
     tokenizer::{Ident, Span, Spanned},
+    Result,
 };
 
-use super::{CCode, CodeGenExpr, Context, ExprValue, SingleExprValue, Type};
+use super::{CCode, CodeGenExpr, CompileTimeValue, Context, ExprValue, SingleExprValue, Type};
 
 impl CodeGenExpr for Expr {
     #[expect(unused_variables)]
@@ -35,8 +36,9 @@ impl CodeGenExpr for LitStr {
     fn generate(&self, _ctx: &mut Context) -> Result<ExprValue> {
         let str = self.str();
         Ok(SingleExprValue {
-            ty: Type::String.into(),
+            ty: Type::string(),
             code: c_code! { #str },
+            value: Some(CompileTimeValue::String(str)),
         }
         .into())
     }
@@ -46,8 +48,9 @@ impl CodeGenExpr for LitChar {
     fn generate(&self, _ctx: &mut Context) -> Result<ExprValue> {
         let char = self.char();
         Ok(SingleExprValue {
-            ty: Type::Character.into(),
+            ty: Type::character(),
             code: c_code! { #char },
+            value: Some(CompileTimeValue::Character(char)),
         }
         .into())
     }
@@ -55,10 +58,11 @@ impl CodeGenExpr for LitChar {
 
 impl CodeGenExpr for LitNumber {
     fn generate(&self, _ctx: &mut Context) -> Result<ExprValue> {
-        let num = self.number::<i32>();
+        let num = self.number();
         Ok(SingleExprValue {
-            ty: Type::Integer.into(),
+            ty: Type::integer(),
             code: c_code! { #num },
+            value: Some(CompileTimeValue::Integer(num)),
         }
         .into())
     }
@@ -87,7 +91,7 @@ where
 {
     let f = name.generate(ctx)?;
     f.flat_map(|f| {
-        let Type::Function(ty) = &*f.ty else {
+        let Some(ty) = f.ty.as_function() else {
             return Err(name.unrecoverable_error("is not a function"));
         };
 
@@ -112,7 +116,7 @@ where
             args.zip(&ty.args)
                 .map(|(arg, ty)| {
                     let value = arg.generate(ctx)?;
-                    match value.filter(|value| value.ty == *ty) {
+                    match value.filter(|value| value.ty.has_same_parent(ty)) {
                         Some(ExprValue::Distinct(value)) => Ok(value),
                         Some(ExprValue::Ambiguous(_)) => {
                             Err(arg.unrecoverable_error("ambiguous argument type"))
@@ -129,6 +133,7 @@ where
             code: c_code! {
                 #f(#(#args),*)
             },
+            value: None,
         }
         .into())
     })
@@ -177,13 +182,14 @@ impl CodeGenExpr for ExprBinary {
 impl ExprValue {
     fn implicit_dereference(self, _ctx: &mut Context) -> Result<ExprValue> {
         self.flat_map(|value| {
-            Ok(match &*value.ty {
-                Type::Function(f) if f.args.is_empty() => SingleExprValue {
+            Ok(match value.ty.as_function() {
+                Some(f) if f.args.is_empty() => SingleExprValue {
                     ty: f.return_type.clone(),
                     code: c_code! { #value() },
+                    value: None,
                 }
                 .into(),
-                Type::Function(_) => {
+                Some(_) => {
                     return Err(Span::call_site()
                         .unrecoverable_error("implicit dereference on function with arguments"))
                 }

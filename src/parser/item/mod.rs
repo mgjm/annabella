@@ -1,14 +1,15 @@
 use crate::{
     tokenizer::{Ident, Span, Spanned},
-    Token,
+    Result, Token,
 };
 
-use super::{Parenthesized, Parse, ParseStream, Result, Stmt};
+use super::{Expr, Parenthesized, Parse, ParseStream, Stmt};
 
 parse! {
     enum Item {
         Function(Function),
         Type(TypeItem),
+        Subtype(SubtypeItem),
         Variable(Variable),
     }
 }
@@ -19,6 +20,8 @@ impl Parse for Item {
             Self::Function(item)
         } else if let Some(item) = input.try_parse()? {
             Self::Type(item)
+        } else if let Some(item) = input.try_parse()? {
+            Self::Subtype(item)
         } else if let Some(item) = input.try_parse()? {
             Self::Variable(item)
         } else {
@@ -186,6 +189,90 @@ impl Parse for EnumTypeDefinition {
     fn parse(input: ParseStream) -> Result<Self> {
         Ok(Self {
             values: input.parse()?,
+        })
+    }
+}
+
+parse! {
+    struct SubtypeItem {
+        type_: Token![subtype],
+        name: Ident,
+        is_: Token![is],
+        mark: Ident,
+        constraint: Option<Constraint>,
+        semi: Token![;],
+    }
+}
+
+impl Parse for SubtypeItem {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let type_ = input.parse()?;
+        input.unrecoverable(|input| {
+            Ok(Self {
+                type_,
+                name: input.parse()?,
+                is_: input.parse()?,
+                mark: input.parse()?,
+                constraint: input.try_parse()?,
+                semi: input.parse()?,
+            })
+        })
+    }
+}
+
+parse!({
+    enum Constraint {
+        Range(RangeConstraint),
+    }
+});
+
+impl Parse for Constraint {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(if let Some(constraint) = input.try_parse()? {
+            Self::Range(constraint)
+        } else {
+            return Err(input.recoverable_error("expected constraint"));
+        })
+    }
+}
+
+parse!({
+    struct RangeConstraint {
+        range_token: Token![range],
+        range: Range,
+    }
+});
+
+impl Parse for RangeConstraint {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let range_token = input.parse()?;
+        input.unrecoverable(|input| {
+            Ok(Self {
+                range_token,
+                range: input.parse()?,
+            })
+        })
+    }
+}
+
+parse!({
+    struct Range {
+        start: Expr,
+        dot_dot: Token![..],
+        end: Expr,
+    }
+});
+
+impl Parse for Range {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let start = input.call(Expr::parse_simple_expression)?;
+        let dot_dot = input.parse()?;
+        input.unrecoverable(|input| {
+            Ok(Self {
+                start,
+                dot_dot,
+                end: input.call(Expr::parse_simple_expression)?,
+            })
         })
     }
 }

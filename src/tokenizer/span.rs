@@ -3,6 +3,8 @@ use std::{
     path::PathBuf, ptr::NonNull,
 };
 
+use crate::Error;
+
 #[cfg(feature = "span-locations")]
 pub(super) type SpanOffset = u32;
 
@@ -24,12 +26,20 @@ pub trait Spanned {
         self.span()
     }
 
-    fn recoverable_error(&self, msg: impl Into<Cow<'static, str>>) -> crate::parser::Error {
-        crate::parser::Error::recoverable(self.span(), msg)
+    fn recoverable_error(&self, msg: impl Into<Cow<'static, str>>) -> Error {
+        Error {
+            span: self.span(),
+            msg: msg.into(),
+            recoverable: true,
+        }
     }
 
-    fn unrecoverable_error(&self, msg: impl Into<Cow<'static, str>>) -> crate::parser::Error {
-        crate::parser::Error::unrecoverable(self.span(), msg)
+    fn unrecoverable_error(&self, msg: impl Into<Cow<'static, str>>) -> Error {
+        Error {
+            span: self.span(),
+            msg: msg.into(),
+            recoverable: false,
+        }
     }
 }
 

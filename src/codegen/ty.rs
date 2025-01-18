@@ -1,107 +1,165 @@
-use std::{fmt, ops::Deref, rc::Rc};
+use std::{fmt, iter, rc::Rc};
+
+use quote::ToTokens;
 
 use crate::{
-    parser::Result,
     tokenizer::{Ident, Spanned},
+    Result,
 };
 
-use super::{Context, Value};
+use super::{Context, TypeValue, Value};
 
-#[derive(Clone, PartialEq, Eq)]
-pub struct RcType(Rc<Type>);
+#[derive(Clone)]
+pub struct Type(Rc<Inner>);
 
-impl fmt::Debug for RcType {
+impl fmt::Debug for Type {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.0.fmt(f)
     }
 }
 
-impl Deref for RcType {
-    type Target = Type;
+macro_rules! singleton {
+    ($ident:ident) => {{
+        thread_local! {
+            static TYPE: Type = Type::new(Inner::$ident);
+        }
+        TYPE.with(Clone::clone)
+    }};
+}
 
-    fn deref(&self) -> &Self::Target {
+impl Type {
+    fn new(inner: Inner) -> Self {
+        Self(Rc::new(inner))
+    }
+
+    pub fn void() -> Self {
+        singleton!(Void)
+    }
+
+    pub fn boolean() -> Self {
+        singleton!(Boolean)
+    }
+
+    pub fn character() -> Self {
+        singleton!(Character)
+    }
+
+    pub fn integer() -> Self {
+        singleton!(Integer)
+    }
+
+    pub fn string() -> Self {
+        singleton!(String)
+    }
+
+    pub fn function(ty: FunctionType) -> Self {
+        Self::new(Inner::Function(ty))
+    }
+
+    pub fn enum_(ty: EnumType) -> Self {
+        Self::new(Inner::Enum(ty))
+    }
+
+    pub fn subtype(ty: SubtypeType) -> Self {
+        Self::new(Inner::Subtype(ty))
+    }
+
+    pub fn parse_ident(ident: &Ident, ctx: &Context) -> Result<Self> {
+        let value = Self::parse_ident_value(ident, ctx)?;
+        Ok(value.ty.clone())
+    }
+
+    pub fn parse_ident_value<'a>(ident: &Ident, ctx: &'a Context<'a>) -> Result<&'a TypeValue> {
+        let Value::Type(value) = ctx.get(ident)? else {
+            return Err(ident.unrecoverable_error("not a type name"));
+        };
+        Ok(value)
+    }
+
+    fn inner(&self) -> &Inner {
         &self.0
     }
-}
 
-impl From<Type> for RcType {
-    fn from(value: Type) -> Self {
-        thread_local! {
-            static VOID: Rc<Type> = Rc::new(Type::Void);
-            static BOOL: Rc<Type> = Rc::new(Type::Bool);
-            static CHAR: Rc<Type> = Rc::new(Type::Character);
-            static INTEGER: Rc<Type> = Rc::new(Type::Integer);
-            static STRING: Rc<Type> = Rc::new(Type::String);
+    pub fn is_void(&self) -> bool {
+        matches!(self.inner(), Inner::Void)
+    }
+
+    pub fn as_function(&self) -> Option<&FunctionType> {
+        match self.inner() {
+            Inner::Function(ty) => Some(ty),
+            _ => None,
         }
-        let singleton = match value {
-            Type::Void => &VOID,
-            Type::Bool => &BOOL,
-            Type::Character => &CHAR,
-            Type::Integer => &INTEGER,
-            Type::String => &STRING,
-            _ => return Self(Rc::new(value)),
-        };
-        Self(singleton.with(Clone::clone))
+    }
+
+    pub fn to_str(&self) -> &str {
+        match self.inner() {
+            Inner::Void => "Void",
+            Inner::Boolean => "Boolean",
+            Inner::Character => "Character",
+            Inner::Integer => "Integer",
+            Inner::String => "String",
+            Inner::Function(ty) => ty.to_str(),
+            Inner::Enum(ty) => ty.to_str(),
+            Inner::Subtype(ty) => ty.to_str(),
+        }
+    }
+
+    pub fn has_same_parent(&self, other: &Self) -> bool {
+        match self.inner() {
+            Inner::Void => matches!(other.inner(), Inner::Void),
+            Inner::Boolean => matches!(other.inner(), Inner::Boolean),
+            Inner::Character => matches!(other.inner(), Inner::Character),
+            Inner::Integer => matches!(other.inner(), Inner::Integer),
+            Inner::String => matches!(other.inner(), Inner::String),
+            Inner::Function(ty) => ty.has_same_parent(other),
+            Inner::Enum(ty) => ty.has_same_parent(other),
+            Inner::Subtype(ty) => ty.has_same_parent(other),
+        }
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum Type {
+impl ToTokens for Type {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        proc_macro2::Ident::new(self.to_str(), proc_macro2::Span::call_site()).to_tokens(tokens)
+    }
+}
+
+#[derive(Debug)]
+pub enum Inner {
     Void,
-    Bool,
+    Boolean,
     Character,
     Integer,
     String,
     Function(FunctionType),
     Enum(EnumType),
-}
-
-impl Type {
-    pub fn void() -> RcType {
-        Self::Void.into()
-    }
-
-    pub fn function(ty: FunctionType) -> RcType {
-        Self::Function(ty).into()
-    }
-
-    pub fn enum_(ty: EnumType) -> RcType {
-        Self::Enum(ty).into()
-    }
-
-    pub fn parse_ident(ident: &Ident, ctx: &Context) -> Result<RcType> {
-        let Value::Type(value) = ctx.get(ident)? else {
-            return Err(ident.unrecoverable_error("not a type name"));
-        };
-        Ok(value.ty.clone())
-    }
-
-    pub fn to_str(&self) -> &str {
-        match self {
-            Self::Void => "Void",
-            Self::Bool => "Bool",
-            Self::Character => "Character",
-            Self::Integer => "Integer",
-            Self::String => "String",
-            Self::Function(ty) => ty.to_str(),
-            Self::Enum(ty) => ty.to_str(),
-        }
-    }
+    Subtype(SubtypeType),
 }
 
 trait TypeImpl: fmt::Debug {
     fn to_str(&self) -> &str;
+    fn has_same_parent(&self, other: &Type) -> bool;
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct FunctionType {
-    pub args: Vec<RcType>,
-    pub return_type: RcType,
+    pub args: Vec<Type>,
+    pub return_type: Type,
 }
 
 impl TypeImpl for FunctionType {
     fn to_str(&self) -> &str {
         "Function"
+    }
+
+    fn has_same_parent(&self, other: &Type) -> bool {
+        let Some(other) = other.as_function() else {
+            return false;
+        };
+
+        self.args.len() == other.args.len()
+            && iter::zip(&self.args, &other.args).all(|(a, b)| a.has_same_parent(b))
+            && self.return_type.has_same_parent(&other.return_type)
     }
 }
 
@@ -114,5 +172,43 @@ pub struct EnumType {
 impl TypeImpl for EnumType {
     fn to_str(&self) -> &str {
         &self.name.name
+    }
+
+    fn has_same_parent(&self, mut other: &Type) -> bool {
+        let other = loop {
+            other = match other.inner() {
+                Inner::Subtype(ty) => &ty.parent,
+                Inner::Enum(ty) => break ty,
+                _ => return false,
+            };
+        };
+
+        self == other
+    }
+}
+
+#[derive(Debug)]
+pub struct SubtypeType {
+    // pub name: Ident,
+    pub parent: Type,
+}
+
+impl SubtypeType {
+    fn parent(&self) -> &Type {
+        let mut parent = &self.parent;
+        while let Inner::Subtype(p) = parent.inner() {
+            parent = &p.parent;
+        }
+        parent
+    }
+}
+
+impl TypeImpl for SubtypeType {
+    fn to_str(&self) -> &str {
+        self.parent().to_str()
+    }
+
+    fn has_same_parent(&self, other: &Type) -> bool {
+        self.parent().has_same_parent(other)
     }
 }
