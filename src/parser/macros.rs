@@ -1,4 +1,7 @@
-macro_rules! parse_enum {
+macro_rules! parse {
+    ({ $($tt:tt)* }) => {
+          parse! { $($tt)* }
+    };
     (
         enum $ident:ident {
             $($var:ident($ty:ty),)*
@@ -17,9 +20,6 @@ macro_rules! parse_enum {
             }
         }
     };
-}
-
-macro_rules! parse_struct {
     (
         struct $ident:ident {
             $($name:ident: $ty:ty,)*

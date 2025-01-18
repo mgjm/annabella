@@ -75,8 +75,14 @@ end;
 --    Put_Line(i'Image);
 --    d := Day'Pred(Wtf);
 
+type Day is (Mon, Tue, Wed, Thu, Fri, Sat, Sun);
+type Weekday is (Mon, Tue, Wed, Thu, Fri);
+-- subtype Weekday is Day range Mon .. Fri;
+
 procedure Main is
    i: Integer;
+   d: Day;
+   wd: Weekday;
 begin
    Print("Start");
    Print("Hello \n World""");
@@ -85,6 +91,10 @@ begin
    Print(i);
    i := Test;
    Print(i);
+   d := Sat;
+   Print(d);
+   wd := Thu;
+   Print(wd);
    Test;
    FooBar;
    Test(Test, Test);

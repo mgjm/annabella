@@ -3,7 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use super::{CCode, RcType, Scope, Type};
+use super::{CCode, RcType, Scope};
 
 pub struct Base {
     inner: Inner,

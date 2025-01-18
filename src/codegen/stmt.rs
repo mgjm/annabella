@@ -81,7 +81,7 @@ impl CodeGenStmt for AssignStmt {
                 }
             };
             Ok(SingleExprValue {
-                ty: Type::Void.into(),
+                ty: Type::void(),
                 code: c_code! {
                     #name = #expr;
                 },

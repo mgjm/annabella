@@ -14,6 +14,7 @@ mod item;
 mod standard;
 mod stmt;
 mod ty;
+mod type_item;
 mod value;
 
 pub use self::{c_code::CCode, context::Context, ty::*, value::*};

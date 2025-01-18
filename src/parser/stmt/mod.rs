@@ -5,7 +5,7 @@ use crate::{
 
 use super::{Expr, Name, Parse, ParseStream, Result};
 
-parse_enum! {
+parse! {
     enum Stmt {
         Expr(ExprStmt),
         Return(ReturnStmt),
@@ -25,7 +25,7 @@ impl Parse for Stmt {
     }
 }
 
-parse_struct! {
+parse! {
     struct ExprStmt {
         expr: Expr,
         semi: Token![;],
@@ -41,7 +41,7 @@ impl Parse for ExprStmt {
     }
 }
 
-parse_struct! {
+parse! {
     struct ReturnStmt {
     return_: Token![return],
         expr: Expr,
@@ -62,7 +62,7 @@ impl Parse for ReturnStmt {
     }
 }
 
-parse_struct! {
+parse! {
     struct AssignStmt {
         name: Name,
         assign: Token![:=],

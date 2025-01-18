@@ -5,6 +5,8 @@ use crate::{
     tokenizer::{Ident, Spanned},
 };
 
+use super::{Context, Value};
+
 #[derive(Clone, PartialEq, Eq)]
 pub struct RcType(Rc<Type>);
 
@@ -51,24 +53,27 @@ pub enum Type {
     Integer,
     String,
     Function(FunctionType),
+    Enum(EnumType),
 }
 
 impl Type {
-    fn parse(s: &str) -> Option<RcType> {
-        Some(
-            match s {
-                "Bool" => Self::Bool,
-                "Character" => Self::Character,
-                "Integer" => Self::Integer,
-                "String" => Self::String,
-                _ => return None,
-            }
-            .into(),
-        )
+    pub fn void() -> RcType {
+        Self::Void.into()
     }
 
-    pub fn parse_ident(ident: &Ident) -> Result<RcType> {
-        Self::parse(&ident.name).ok_or_else(|| ident.unrecoverable_error("unknown type"))
+    pub fn function(ty: FunctionType) -> RcType {
+        Self::Function(ty).into()
+    }
+
+    pub fn enum_(ty: EnumType) -> RcType {
+        Self::Enum(ty).into()
+    }
+
+    pub fn parse_ident(ident: &Ident, ctx: &Context) -> Result<RcType> {
+        let Value::Type(value) = ctx.get(ident)? else {
+            return Err(ident.unrecoverable_error("not a type name"));
+        };
+        Ok(value.ty.clone())
     }
 
     pub fn to_str(&self) -> &str {
@@ -79,6 +84,7 @@ impl Type {
             Self::Integer => "Integer",
             Self::String => "String",
             Self::Function(ty) => ty.to_str(),
+            Self::Enum(ty) => ty.to_str(),
         }
     }
 }
@@ -96,5 +102,17 @@ pub struct FunctionType {
 impl TypeImpl for FunctionType {
     fn to_str(&self) -> &str {
         "Function"
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct EnumType {
+    pub name: Ident,
+    pub values: Vec<Ident>,
+}
+
+impl TypeImpl for EnumType {
+    fn to_str(&self) -> &str {
+        &self.name.name
     }
 }

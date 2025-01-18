@@ -5,7 +5,7 @@ use crate::{
 
 use super::{Parenthesized, Parse, ParseStream, Result};
 
-parse_enum! {
+parse! {
     enum Expr {
         Lit(ExprLit),
         Name(Name),
@@ -217,7 +217,7 @@ impl Expr {
     }
 }
 
-parse_enum! {
+parse! {
     enum ExprLit {
         Str(LitStr),
         Char(LitChar),
@@ -245,7 +245,7 @@ impl Parse for ExprLit {
     }
 }
 
-parse_struct! {
+parse! {
     struct LitStr {
         lit: Literal,
     }
@@ -263,7 +263,7 @@ impl LitStr {
     }
 }
 
-parse_struct! {
+parse! {
     struct LitChar {
         lit: Literal,
     }
@@ -285,7 +285,7 @@ impl LitChar {
     }
 }
 
-parse_struct! {
+parse! {
     struct LitNumber {
         lit: Literal,
     }
@@ -300,7 +300,7 @@ impl LitNumber {
     }
 }
 
-parse_enum! {
+parse! {
     enum Name {
         Base(BaseName),
         FunctionCall(FunctionCall),
@@ -323,7 +323,7 @@ impl Parse for Name {
     }
 }
 
-parse_enum! {
+parse! {
     enum BaseName {
         Ident(Ident),
     }
@@ -335,21 +335,21 @@ impl Parse for BaseName {
     }
 }
 
-parse_struct! {
+parse! {
     struct FunctionCall {
         name: Box<Name>,
         args: Parenthesized<Expr>,
     }
 }
 
-parse_struct! {
+parse! {
     struct ExprUnary {
         op: UnaryOp,
         expr: Box<Expr>,
     }
 }
 
-parse_enum! {
+parse! {
     enum UnaryOp {
         Abs(Token![abs]),
         Not(Token![not]),
@@ -358,7 +358,7 @@ parse_enum! {
     }
 }
 
-parse_struct! {
+parse! {
     struct ExprBinary {
         lhs: Box<Expr>,
         op: BinaryOp,
@@ -366,7 +366,7 @@ parse_struct! {
     }
 }
 
-parse_enum! {
+parse! {
     enum BinaryOp {
         Pow(Token![**]),
         Mul(Token![*]),
@@ -388,7 +388,7 @@ parse_enum! {
     }
 }
 
-parse_struct! {
+parse! {
     struct ExprShortCircuit {
         lhs: Box<Expr>,
         op: ShortCircuitOp,
@@ -398,7 +398,7 @@ parse_struct! {
 
 mod helper {
     use super::*;
-    parse_enum! {
+    parse! {
         enum LogicalOp {
             Binary(BinaryOp),
             ShortCircuit(ShortCircuitOp),
@@ -406,21 +406,21 @@ mod helper {
     }
 }
 
-parse_enum! {
+parse! {
     enum ShortCircuitOp {
         And(AndThen),
         Or(OrElse),
     }
 }
 
-parse_struct! {
+parse! {
     struct AndThen {
         and: Token![and],
         then: Token![then],
     }
 }
 
-parse_struct! {
+parse! {
     struct OrElse {
         or: Token![or],
         else_: Token![else],

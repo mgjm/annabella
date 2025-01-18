@@ -1,7 +1,4 @@
-use crate::{
-    parser::{Function, Item, Result, Variable},
-    tokenizer::Spanned,
-};
+use crate::parser::{Function, Item, Result, Variable};
 
 use super::{CCode, CodeGenStmt, Context, FunctionType, FunctionValue, Type, Value, VariableValue};
 
@@ -9,6 +6,7 @@ impl CodeGenStmt for Item {
     fn generate(&self, ctx: &mut Context) -> Result<CCode> {
         match self {
             Self::Function(item) => item.generate(ctx),
+            Self::Type(item) => item.generate(ctx),
             Self::Variable(item) => item.generate(ctx),
         }
     }
@@ -43,14 +41,19 @@ impl CodeGenStmt for Function {
             c_code! { #ty #name }
         });
 
-        let mut sub_ctx = ctx.subscope(self.return_type().map(Type::parse_ident).transpose()?);
+        let mut sub_ctx = ctx.subscope(
+            self.return_type()
+                .map(|arg| Type::parse_ident(arg, ctx))
+                .transpose()?,
+        );
         for arg in self.args() {
             let name = &arg.name;
+            let ty = Type::parse_ident(&arg.ty, &sub_ctx)?;
             sub_ctx.insert(
                 &arg.name,
                 Value::Variable(VariableValue {
                     name: c_code! { #name },
-                    ty: Type::parse_ident(&arg.ty)?,
+                    ty,
                 }),
             )?;
         }
@@ -81,13 +84,13 @@ impl CodeGenStmt for Function {
 
         let args = self
             .args()
-            .map(|arg| Type::parse_ident(&arg.ty))
+            .map(|arg| Type::parse_ident(&arg.ty, ctx))
             .collect::<Result<Vec<_>>>()?;
 
         let return_type = if let Some(ty) = self.return_type() {
-            Type::parse_ident(ty)?
+            Type::parse_ident(ty, ctx)?
         } else {
-            Type::Void.into()
+            Type::void()
         };
 
         ctx.insert(
@@ -104,11 +107,12 @@ impl CodeGenStmt for Function {
 impl CodeGenStmt for Variable {
     fn generate(&self, ctx: &mut Context) -> Result<CCode> {
         let name = &self.name;
+        let ty = Type::parse_ident(&self.ty, ctx)?;
         ctx.insert(
             name,
             Value::Variable(VariableValue {
                 name: c_code! { #name },
-                ty: Type::parse_ident(&self.ty)?,
+                ty,
             }),
         )?;
         let ty = &self.ty;

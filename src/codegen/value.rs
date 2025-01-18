@@ -1,4 +1,4 @@
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::{btree_map::Entry, BTreeMap};
 
 use crate::{
     parser::Result,
@@ -10,7 +10,7 @@ use super::{CCode, ExprValue, RcType, SingleExprValue};
 #[derive(Debug, Default)]
 pub struct Scope<'a> {
     parent: Option<&'a Scope<'a>>,
-    values: HashMap<Box<str>, Value>,
+    values: BTreeMap<Box<str>, Value>,
 }
 
 impl Scope<'_> {
@@ -46,6 +46,7 @@ impl Scope<'_> {
 #[derive(Debug)]
 pub enum Value {
     Function(FunctionValue),
+    Type(TypeValue),
     Variable(VariableValue),
 }
 
@@ -60,6 +61,7 @@ impl Value {
     pub(super) fn expr_value(&self) -> ExprValue {
         match self {
             Self::Function(value) => value.expr_value(),
+            Self::Type(_value) => unreachable!(),
             Self::Variable(value) => value.expr_value(),
         }
     }
@@ -94,6 +96,12 @@ impl FunctionValue {
 
 #[derive(Debug)]
 struct FunctionOverload {
+    pub name: CCode,
+    pub ty: RcType,
+}
+
+#[derive(Debug)]
+pub struct TypeValue {
     pub name: CCode,
     pub ty: RcType,
 }

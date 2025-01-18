@@ -1,10 +1,11 @@
 use crate::{
+    codegen::TypeValue,
     parser::Result,
     tokenizer::{Ident, Span},
     Token,
 };
 
-use super::{CCode, Context, FunctionType, FunctionValue, Type, Value};
+use super::{CCode, Context, FunctionType, FunctionValue, RcType, Type, Value};
 
 pub fn generate(ctx: &mut Context) -> Result<()> {
     ctx.push_type(c_code! {
@@ -56,34 +57,64 @@ pub fn generate(ctx: &mut Context) -> Result<()> {
         xor ^
     }
 
-    let print = Ident {
-        name: "Print".into(),
-        span: Span::call_site(),
-    };
     for (ty, fmt) in [
         (Type::Integer, "%d"),
         (Type::String, "%s"),
         (Type::Character, "%c"),
     ] {
-        let ident = quote::format_ident!("annabella_print_{}", ty.to_str());
-        let ty_ident = quote::format_ident!("{}", ty.to_str());
-        ctx.push_function(c_code! {
-            void #ident(#ty_ident value) {
-                printf(#fmt "\n", value);
-            }
-        });
+        let ty: RcType = ty.into();
+        let ident = Ident {
+            name: ty.to_str().into(),
+            span: Span::call_site(),
+        };
         ctx.insert(
-            &print,
-            Value::Function(FunctionValue::new(
-                c_code! { #ident },
-                Type::Function(FunctionType {
-                    args: vec![ty.into()],
-                    return_type: Type::Void.into(),
-                })
-                .into(),
-            )),
+            &ident,
+            Value::Type(TypeValue {
+                name: c_code! { #ident },
+                ty: ty.clone(),
+            }),
         )?;
+        generate_print(ty, fmt, ctx)?;
     }
+
+    Ok(())
+}
+
+pub fn generate_print(ty: RcType, fmt: &'static str, ctx: &mut Context) -> Result<()> {
+    generate_custom_print(
+        ty,
+        c_code! {
+            printf(#fmt "\n", self);
+        },
+        ctx,
+    )
+}
+
+pub fn generate_custom_print(ty: RcType, code: CCode, ctx: &mut Context) -> Result<()> {
+    let print = Ident {
+        name: "Print".into(),
+        span: Span::call_site(),
+    };
+
+    let ident = quote::format_ident!("annabella_print_{}", ty.to_str());
+    let ty_ident = quote::format_ident!("{}", ty.to_str());
+    ctx.push_function(c_code! {
+        void #ident(#ty_ident self) {
+            #code
+        }
+    });
+
+    ctx.insert(
+        &print,
+        Value::Function(FunctionValue::new(
+            c_code! { #ident },
+            Type::Function(FunctionType {
+                args: vec![ty],
+                return_type: Type::Void.into(),
+            })
+            .into(),
+        )),
+    )?;
 
     Ok(())
 }

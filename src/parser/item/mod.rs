@@ -5,9 +5,10 @@ use crate::{
 
 use super::{Parenthesized, Parse, ParseStream, Result, Stmt};
 
-parse_enum! {
+parse! {
     enum Item {
         Function(Function),
+        Type(TypeItem),
         Variable(Variable),
     }
 }
@@ -17,13 +18,15 @@ impl Parse for Item {
         Ok(if let Some(item) = input.try_parse()? {
             Self::Function(item)
         } else if let Some(item) = input.try_parse()? {
+            Self::Type(item)
+        } else if let Some(item) = input.try_parse()? {
             Self::Variable(item)
         } else {
             return Err(input.unrecoverable_error("expected item"));
         })
     }
 }
-parse_struct! {
+parse! {
     struct Function {
         kind: FunctionKind,
         name: Ident,
@@ -87,7 +90,7 @@ impl Parse for Function {
     }
 }
 
-parse_enum! {
+parse! {
     enum FunctionKind {
         Procedure(Token![procedure]),
         Function(Token![function]),
@@ -106,7 +109,7 @@ impl Parse for FunctionKind {
     }
 }
 
-parse_struct! {
+parse! {
     struct Param {
         name: Ident,
         colon: Token![:],
@@ -124,7 +127,70 @@ impl Parse for Param {
     }
 }
 
-parse_struct! {
+parse! {
+    enum TypeItem {
+        Full(FullTypeItem),
+    }
+}
+
+impl Parse for TypeItem {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(Self::Full(input.parse()?))
+    }
+}
+
+parse! {
+    struct FullTypeItem {
+        type_: Token![type],
+        name: Ident,
+        is_: Token![is],
+        definition: TypeDefinition,
+        semi: Token![;],
+    }
+}
+
+impl Parse for FullTypeItem {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let type_ = input.parse()?;
+        input.unrecoverable(|input| {
+            Ok(Self {
+                type_,
+                name: input.parse()?,
+                is_: input.parse()?,
+                definition: input.parse()?,
+                semi: input.parse()?,
+            })
+        })
+    }
+}
+
+parse!({
+    enum TypeDefinition {
+        Enum(EnumTypeDefinition),
+    }
+});
+
+impl Parse for TypeDefinition {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(Self::Enum(input.parse()?))
+    }
+}
+
+parse!({
+    struct EnumTypeDefinition {
+        values: Parenthesized<Ident>,
+    }
+});
+
+impl Parse for EnumTypeDefinition {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(Self {
+            values: input.parse()?,
+        })
+    }
+}
+
+parse! {
     struct Variable {
         name: Ident,
         colon: Token![:],
