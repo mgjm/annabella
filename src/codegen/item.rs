@@ -43,15 +43,14 @@ impl CodeGenStmt for Function {
             c_code! { #ty #name }
         });
 
-        let mut sub_ctx = ctx.subscope();
+        let mut sub_ctx = ctx.subscope(self.return_type().map(Type::parse_ident).transpose()?);
         for arg in self.args() {
             let name = &arg.name;
             sub_ctx.insert(
                 &arg.name,
                 Value::Variable(VariableValue {
                     name: c_code! { #name },
-                    ty: Type::parse(&arg.ty.name)
-                        .ok_or_else(|| arg.ty.unrecoverable_error("unknown type"))?,
+                    ty: Type::parse_ident(&arg.ty)?,
                 }),
             )?;
         }
@@ -82,14 +81,11 @@ impl CodeGenStmt for Function {
 
         let args = self
             .args()
-            .map(|arg| {
-                Type::parse(&arg.ty.name)
-                    .ok_or_else(|| arg.ty.unrecoverable_error("unsupported type"))
-            })
+            .map(|arg| Type::parse_ident(&arg.ty))
             .collect::<Result<Vec<_>>>()?;
 
         let return_type = if let Some(ty) = self.return_type() {
-            Type::parse(&ty.name).ok_or_else(|| ty.unrecoverable_error("unspupported type"))?
+            Type::parse_ident(ty)?
         } else {
             Type::Void.into()
         };
@@ -112,8 +108,7 @@ impl CodeGenStmt for Variable {
             name,
             Value::Variable(VariableValue {
                 name: c_code! { #name },
-                ty: Type::parse(&self.ty.name)
-                    .ok_or_else(|| self.ty.unrecoverable_error("unspupported type"))?,
+                ty: Type::parse_ident(&self.ty)?,
             }),
         )?;
         let ty = &self.ty;

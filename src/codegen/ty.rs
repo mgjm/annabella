@@ -1,5 +1,10 @@
 use std::{fmt, ops::Deref, rc::Rc};
 
+use crate::{
+    parser::Result,
+    tokenizer::{Ident, Spanned},
+};
+
 #[derive(Clone, PartialEq, Eq)]
 pub struct RcType(Rc<Type>);
 
@@ -49,7 +54,7 @@ pub enum Type {
 }
 
 impl Type {
-    pub fn parse(s: &str) -> Option<RcType> {
+    fn parse(s: &str) -> Option<RcType> {
         Some(
             match s {
                 "Bool" => Self::Bool,
@@ -62,6 +67,10 @@ impl Type {
         )
     }
 
+    pub fn parse_ident(ident: &Ident) -> Result<RcType> {
+        Self::parse(&ident.name).ok_or_else(|| ident.unrecoverable_error("unknown type"))
+    }
+
     pub fn to_str(&self) -> &str {
         match self {
             Self::Void => "Void",
@@ -72,22 +81,10 @@ impl Type {
             Self::Function(ty) => ty.to_str(),
         }
     }
-
-    pub fn fmt(&self) -> (&str, bool) {
-        match self {
-            Self::Void => ("<void>", false),
-            Self::Bool => ("%d", true),
-            Self::Character => ("%c", true),
-            Self::Integer => ("%d", true),
-            Self::String => ("%s", true),
-            Self::Function(ty) => ty.c_fmt_str(),
-        }
-    }
 }
 
 trait TypeImpl: fmt::Debug {
     fn to_str(&self) -> &str;
-    fn c_fmt_str(&self) -> (&str, bool);
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -99,9 +96,5 @@ pub struct FunctionType {
 impl TypeImpl for FunctionType {
     fn to_str(&self) -> &str {
         "Function"
-    }
-
-    fn c_fmt_str(&self) -> (&str, bool) {
-        ("<function>", false)
     }
 }

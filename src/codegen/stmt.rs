@@ -3,7 +3,7 @@ use crate::{
     tokenizer::Spanned,
 };
 
-use super::{CCode, CodeGenExpr, CodeGenStmt, Context, ExprValue};
+use super::{CCode, CodeGenExpr, CodeGenStmt, Context, ExprValue, SingleExprValue, Type};
 
 impl CodeGenStmt for Stmt {
     fn generate(&self, ctx: &mut Context) -> Result<CCode> {
@@ -17,28 +17,45 @@ impl CodeGenStmt for Stmt {
 
 impl CodeGenStmt for ExprStmt {
     fn generate(&self, ctx: &mut Context) -> Result<CCode> {
-        let ExprValue::Distinct(expr) = self.expr.generate(ctx)? else {
-            return Err(self.expr.unrecoverable_error("ambiguous expression"));
+        let expr = match self
+            .expr
+            .generate(ctx)?
+            .filter(|value| *value.ty == Type::Void)
+        {
+            Some(ExprValue::Distinct(expr)) => expr,
+            Some(ExprValue::Ambiguous(_)) => {
+                return Err(self.expr.unrecoverable_error("ambiguous expression"));
+            }
+            None => {
+                return Err(self.expr.unrecoverable_error("expression type not allowed"));
+            }
         };
 
-        let (fmt, use_value) = expr.ty.fmt();
-        Ok(if use_value {
-            c_code! {
-                printf(#fmt "\n", #expr);
-            }
-        } else {
-            c_code! {
-                #expr;
-                printf(#fmt "\n");
-            }
+        Ok(c_code! {
+            #expr;
         })
     }
 }
 
 impl CodeGenStmt for ReturnStmt {
     fn generate(&self, ctx: &mut Context) -> Result<CCode> {
-        let ExprValue::Distinct(expr) = self.expr.generate(ctx)? else {
-            return Err(self.expr.unrecoverable_error("ambiguous expression"));
+        let Some(return_type) = ctx.return_type() else {
+            return Err(self
+                .return_
+                .unrecoverable_error("return not allowed in this context"));
+        };
+        let expr = match self
+            .expr
+            .generate(ctx)?
+            .filter(|value| *value.ty == *return_type)
+        {
+            Some(ExprValue::Distinct(expr)) => expr,
+            Some(ExprValue::Ambiguous(_)) => {
+                return Err(self.expr.unrecoverable_error("ambiguous expression"));
+            }
+            None => {
+                return Err(self.expr.unrecoverable_error("expression type not allowed"));
+            }
         };
 
         Ok(c_code! {
@@ -49,14 +66,32 @@ impl CodeGenStmt for ReturnStmt {
 
 impl CodeGenStmt for AssignStmt {
     fn generate(&self, ctx: &mut Context) -> Result<CCode> {
-        let ExprValue::Distinct(name) = self.name.generate(ctx)? else {
-            return Err(self.name.unrecoverable_error("ambiguous expression"));
+        let expr = self.name.generate(ctx)?.flat_map(|name| {
+            let expr = match self
+                .expr
+                .generate(ctx)?
+                .filter(|value| *value.ty == *name.ty)
+            {
+                Some(ExprValue::Distinct(expr)) => expr,
+                Some(ExprValue::Ambiguous(_)) => {
+                    return Err(self.expr.unrecoverable_error("ambiguous expression"));
+                }
+                None => {
+                    return Err(self.expr.unrecoverable_error("expression type not allowed"));
+                }
+            };
+            Ok(SingleExprValue {
+                ty: Type::Void.into(),
+                code: c_code! {
+                    #name = #expr;
+                },
+            }
+            .into())
+        })?;
+        let ExprValue::Distinct(expr) = expr else {
+            return Err(self.expr.unrecoverable_error("ambiguous assignment"));
         };
-        let ExprValue::Distinct(expr) = self.expr.generate(ctx)? else {
-            return Err(self.expr.unrecoverable_error("ambiguous expression"));
-        };
-        Ok(c_code! {
-            #name = #expr;
-        })
+
+        Ok(expr.code)
     }
 }

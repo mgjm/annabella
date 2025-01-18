@@ -2,27 +2,38 @@
 
 procedure FooBar is
 begin
-   "Foo Bar";
+   Print("Foo Bar");
+end;
+
+procedure Test is
+begin
+   Print("Inside Test procedure");
 end;
 
 function Test return Integer is
 begin
-   "Inside Test function";
+   Print("Inside Test int function");
    return 9000;
 end;
 
 function Test return String is
 begin
-   "Inside Test function";
+   Print("Inside Test str function");
    return "Test overload";
 end;
 
 procedure Test (foo: Integer; bar: String) is
 begin
-   "Test2:";
-   foo * 1000;
-   bar;
-   "end Test2";
+   Print("Test2:");
+   Print(foo * 1000);
+   Print(bar);
+   Print("end Test2");
+end;
+
+
+function ReturnCheck return Integer is
+begin
+   return Test;
 end;
 
 -- procedure Test (foo: String) is
@@ -67,15 +78,17 @@ end;
 procedure Main is
    i: Integer;
 begin
-   "Start";
-   "Hello \n World""";
-   'x';
+   Print("Start");
+   Print("Hello \n World""");
+   Print('x');
    i := 123;
-   i;
-   i := 42;
-   i;
+   Print(i);
+   i := Test;
+   Print(i);
+   Test;
    FooBar;
    Test(Test, Test);
-   1 + 2 * 5 / 2 > 1 or 5 > 2;
-   "End";
+   Print(1 + 2 * 5 / 2 > 1 or 5 > 2);
+   Print(ReturnCheck);
+   Print("End");
 end;
