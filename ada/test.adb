@@ -95,10 +95,10 @@ begin
    Print(d);
    wd := Thu;
    Print(wd);
-   wd := d;
-   Print(d);
    d := wd;
    Print(d);
+   wd := d;
+   Print(wd);
    Test;
    FooBar;
    Test(Test, Test);

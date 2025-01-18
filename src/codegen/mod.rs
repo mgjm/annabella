@@ -199,6 +199,29 @@ impl ToTokens for SingleExprValue {
 
 trait CodeGenExpr: Spanned {
     fn generate(&self, ctx: &mut Context) -> Result<ExprValue>;
+
+    fn generate_with_type_and_check(&self, ty: &Type, ctx: &mut Context) -> Result<CCode> {
+        let expr = match self
+            .generate(ctx)?
+            .filter(|value| value.ty.has_same_parent(ty))
+        {
+            Some(ExprValue::Distinct(expr)) => expr,
+            Some(ExprValue::Ambiguous(_)) => {
+                return Err(self.unrecoverable_error("ambiguous expression"));
+            }
+            None => {
+                return Err(self.unrecoverable_error("expression type not allowed"));
+            }
+        };
+        if let Some(constraint_check) = ty.needs_constraint_check(&expr.ty) {
+            let code = expr.code;
+            Ok(c_code! {
+                #constraint_check(#code)
+            })
+        } else {
+            Ok(expr.code)
+        }
+    }
 }
 
 impl ToTokens for Ident {

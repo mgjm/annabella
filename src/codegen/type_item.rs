@@ -8,8 +8,8 @@ use crate::{
 };
 
 use super::{
-    standard, CCode, CodeGenStmt, Context, EnumType, FunctionType, FunctionValue, SubtypeType,
-    Type, TypeValue, Value,
+    standard, CCode, CodeGenExpr, CodeGenStmt, Context, EnumType, FunctionType, FunctionValue,
+    SubtypeType, Type, TypeValue, Value,
 };
 
 impl CodeGenStmt for TypeItem {
@@ -97,13 +97,30 @@ impl CodeGenStmt for SubtypeItem {
         let name = &self.name;
         let parent = Type::parse_ident(&self.mark, ctx)?;
 
-        let _constraint = self
+        let constraint = self
             .constraint
             .as_ref()
-            .map(|constraint| constraint.generate(ctx))
+            .map(|constraint| constraint.generate(&parent, ctx))
             .transpose()?;
 
-        let ty = Type::subtype(SubtypeType { parent });
+        let constraint_check = if let Some(constraint) = constraint {
+            let ident = quote::format_ident!("annabella_constraint__{name}");
+
+            ctx.push_function(c_code! {
+                #parent #ident(#parent self) {
+                    #constraint
+                    return self;
+                }
+            });
+            Some(c_code! { #ident })
+        } else {
+            None
+        };
+
+        let ty = Type::subtype(SubtypeType {
+            parent,
+            constraint_check,
+        });
         let c_name = quote::format_ident!("{}", ty.to_str());
         ctx.insert(
             name,
@@ -118,16 +135,21 @@ impl CodeGenStmt for SubtypeItem {
 }
 
 impl Constraint {
-    fn generate(&self, ctx: &mut Context) -> Result<CCode> {
+    fn generate(&self, ty: &Type, ctx: &mut Context) -> Result<CCode> {
         match self {
-            Self::Range(constraint) => constraint.generate(ctx),
+            Self::Range(constraint) => constraint.generate(ty, ctx),
         }
     }
 }
 
 impl RangeConstraint {
-    fn generate(&self, ctx: &mut Context) -> Result<CCode> {
-        let _ = ctx;
-        Ok(c_code! {})
+    fn generate(&self, ty: &Type, ctx: &mut Context) -> Result<CCode> {
+        let start = self.range.start.generate_with_type_and_check(ty, ctx)?;
+        let end = self.range.end.generate_with_type_and_check(ty, ctx)?;
+        Ok(c_code! {
+            if (self < #start || #end < self) {
+                throw_Constraint_Error();
+            }
+        })
     }
 }

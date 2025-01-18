@@ -18,16 +18,7 @@ impl CodeGenStmt for Stmt {
 
 impl CodeGenStmt for ExprStmt {
     fn generate(&self, ctx: &mut Context) -> Result<CCode> {
-        let expr = match self.expr.generate(ctx)?.filter(|value| value.ty.is_void()) {
-            Some(ExprValue::Distinct(expr)) => expr,
-            Some(ExprValue::Ambiguous(_)) => {
-                return Err(self.expr.unrecoverable_error("ambiguous expression"));
-            }
-            None => {
-                return Err(self.expr.unrecoverable_error("expression type not allowed"));
-            }
-        };
-
+        let expr = self.expr.generate_with_type_and_check(&Type::void(), ctx)?;
         Ok(c_code! {
             #expr;
         })
@@ -41,20 +32,7 @@ impl CodeGenStmt for ReturnStmt {
                 .return_
                 .unrecoverable_error("return not allowed in this context"));
         };
-        let expr = match self
-            .expr
-            .generate(ctx)?
-            .filter(|value| value.ty.has_same_parent(&return_type))
-        {
-            Some(ExprValue::Distinct(expr)) => expr,
-            Some(ExprValue::Ambiguous(_)) => {
-                return Err(self.expr.unrecoverable_error("ambiguous expression"));
-            }
-            None => {
-                return Err(self.expr.unrecoverable_error("expression type not allowed"));
-            }
-        };
-
+        let expr = self.expr.generate_with_type_and_check(&return_type, ctx)?;
         Ok(c_code! {
             return #expr;
         })
@@ -64,19 +42,7 @@ impl CodeGenStmt for ReturnStmt {
 impl CodeGenStmt for AssignStmt {
     fn generate(&self, ctx: &mut Context) -> Result<CCode> {
         let expr = self.name.generate(ctx)?.flat_map(|name| {
-            let expr = match self
-                .expr
-                .generate(ctx)?
-                .filter(|value| value.ty.has_same_parent(&name.ty))
-            {
-                Some(ExprValue::Distinct(expr)) => expr,
-                Some(ExprValue::Ambiguous(_)) => {
-                    return Err(self.expr.unrecoverable_error("ambiguous expression"));
-                }
-                None => {
-                    return Err(self.expr.unrecoverable_error("expression type not allowed"));
-                }
-            };
+            let expr = self.expr.generate_with_type_and_check(&name.ty, ctx)?;
             Ok(SingleExprValue {
                 ty: Type::void(),
                 code: c_code! {

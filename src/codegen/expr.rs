@@ -114,18 +114,7 @@ where
             }
 
             args.zip(&ty.args)
-                .map(|(arg, ty)| {
-                    let value = arg.generate(ctx)?;
-                    match value.filter(|value| value.ty.has_same_parent(ty)) {
-                        Some(ExprValue::Distinct(value)) => Ok(value),
-                        Some(ExprValue::Ambiguous(_)) => {
-                            Err(arg.unrecoverable_error("ambiguous argument type"))
-                        }
-                        None => {
-                            Err(arg.unrecoverable_error(format!("wrong type, expected: {ty:?}")))
-                        }
-                    }
-                })
+                .map(|(arg, ty)| arg.generate_with_type_and_check(ty, ctx))
                 .collect::<Result<Vec<_>>>()?
         };
         Ok(SingleExprValue {

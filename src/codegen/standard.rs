@@ -74,6 +74,14 @@ pub fn generate(ctx: &mut Context) -> Result<()> {
         generate_print(ty, fmt, ctx)?;
     }
 
+    ctx.push_include("<stdlib.h>");
+    ctx.push_function(c_code! {
+        void throw_Constraint_Error() {
+            fprintf(stderr, "Error: Constraint_Error\n");
+            exit(1);
+        }
+    });
+
     Ok(())
 }
 

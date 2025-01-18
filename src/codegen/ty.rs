@@ -1,4 +1,4 @@
-use std::{fmt, iter, rc::Rc};
+use std::{fmt, iter, ptr, rc::Rc};
 
 use quote::ToTokens;
 
@@ -7,7 +7,7 @@ use crate::{
     Result,
 };
 
-use super::{Context, TypeValue, Value};
+use super::{CCode, Context, TypeValue, Value};
 
 #[derive(Clone)]
 pub struct Type(Rc<Inner>);
@@ -116,6 +116,20 @@ impl Type {
             Inner::Subtype(ty) => ty.has_same_parent(other),
         }
     }
+
+    /// Is a constraint check required when assigning a `source` value to `self`?
+    pub fn needs_constraint_check(&self, source: &Self) -> Option<&CCode> {
+        match self.inner() {
+            Inner::Void => None,
+            Inner::Boolean => None,
+            Inner::Character => None,
+            Inner::Integer => None,
+            Inner::String => None,
+            Inner::Function(ty) => ty.needs_constraint_check(source),
+            Inner::Enum(ty) => ty.needs_constraint_check(source),
+            Inner::Subtype(ty) => ty.needs_constraint_check(source),
+        }
+    }
 }
 
 impl ToTokens for Type {
@@ -139,6 +153,7 @@ pub enum Inner {
 trait TypeImpl: fmt::Debug {
     fn to_str(&self) -> &str;
     fn has_same_parent(&self, other: &Type) -> bool;
+    fn needs_constraint_check(&self, source: &Type) -> Option<&CCode>;
 }
 
 #[derive(Debug)]
@@ -160,6 +175,10 @@ impl TypeImpl for FunctionType {
         self.args.len() == other.args.len()
             && iter::zip(&self.args, &other.args).all(|(a, b)| a.has_same_parent(b))
             && self.return_type.has_same_parent(&other.return_type)
+    }
+
+    fn needs_constraint_check(&self, _target: &Type) -> Option<&CCode> {
+        None
     }
 }
 
@@ -185,12 +204,17 @@ impl TypeImpl for EnumType {
 
         self == other
     }
+
+    fn needs_constraint_check(&self, _target: &Type) -> Option<&CCode> {
+        None
+    }
 }
 
 #[derive(Debug)]
 pub struct SubtypeType {
     // pub name: Ident,
     pub parent: Type,
+    pub constraint_check: Option<CCode>,
 }
 
 impl SubtypeType {
@@ -210,5 +234,14 @@ impl TypeImpl for SubtypeType {
 
     fn has_same_parent(&self, other: &Type) -> bool {
         self.parent().has_same_parent(other)
+    }
+
+    fn needs_constraint_check(&self, source: &Type) -> Option<&CCode> {
+        if let Inner::Subtype(source) = source.inner() {
+            if ptr::eq(self, source) {
+                return None;
+            }
+        }
+        self.constraint_check.as_ref()
     }
 }
