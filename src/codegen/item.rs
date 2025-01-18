@@ -3,7 +3,10 @@ use crate::{
     Result,
 };
 
-use super::{CCode, CodeGenStmt, Context, FunctionType, FunctionValue, Type, Value, VariableValue};
+use super::{
+    CCode, CodeGenStmt, Context, FunctionType, FunctionValue, IdentBuilder, Type, Value,
+    VariableValue,
+};
 
 impl CodeGenStmt for Item {
     fn generate(&self, ctx: &mut Context) -> Result<CCode> {
@@ -18,18 +21,11 @@ impl CodeGenStmt for Item {
 
 impl Function {
     fn c_name(&self) -> CCode {
-        use std::fmt::Write;
-
-        let mut ident = format!("annabella_{}_", self.name);
-        if let Some(args) = &self.args {
-            for arg in args.iter() {
-                write!(ident, "__{}", arg.ty).unwrap();
-            }
-        }
-        if let Some((_, ty)) = &self.return_type {
-            write!(ident, "___{ty}").unwrap();
-        }
-        let ident = quote::format_ident!("{}", ident);
+        let ident = IdentBuilder::function(
+            &self.name,
+            self.args().map(|arg| &arg.ty),
+            self.return_type(),
+        );
         c_code! {
             #ident
         }

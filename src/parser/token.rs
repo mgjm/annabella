@@ -28,7 +28,7 @@ macro_rules! Token {
         $crate::parser::token::Dot
     };
     (/) => {
-        $crate::parser::token::Dib
+        $crate::parser::token::Div
     };
     (:) => {
         $crate::parser::token::Colon
@@ -300,7 +300,7 @@ where
     type Token = T;
 }
 
-pub trait Token: Parse {
+pub trait Token: Parse + fmt::Debug {
     const DISPLAY: &'static str;
 
     fn peek() -> bool;
@@ -447,7 +447,7 @@ punct_token!("+", Add);
 punct_token!(",", Comma);
 punct_token!("-", Sub);
 punct_token!(".", Dot);
-punct_token!("/", Dib);
+punct_token!("/", Div);
 punct_token!(":", Colon);
 punct_token!(";", Semicolon);
 punct_token!("<", Lt);

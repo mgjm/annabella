@@ -4,7 +4,7 @@ use crate::{
     Result, Token,
 };
 
-use super::{CCode, Context, FunctionType, FunctionValue, Type, Value};
+use super::{CCode, Context, FunctionType, FunctionValue, IdentBuilder, Type, Value};
 
 pub fn generate(ctx: &mut Context) -> Result<()> {
     ctx.push_type(c_code! {
@@ -17,7 +17,7 @@ pub fn generate(ctx: &mut Context) -> Result<()> {
         ($($ada:tt $c:tt)*) => {
             $(
                 let op: Token![$ada] = Default::default();
-                let ident = quote::format_ident!("annabella__op_{op:?}__Integer__Integer");
+                let ident = IdentBuilder::op_function(op, &Type::integer());
                 ctx.push_function(c_code! {
                     Integer #ident(Integer lhs, Integer rhs) {
                         return lhs $c rhs;
@@ -64,13 +64,7 @@ pub fn generate(ctx: &mut Context) -> Result<()> {
             name: ty.to_str().into(),
             span: Span::call_site(),
         };
-        ctx.insert(
-            &ident,
-            Value::Type(TypeValue {
-                name: c_code! { #ident },
-                ty: ty.clone(),
-            }),
-        )?;
+        ctx.insert(&ident, Value::Type(TypeValue { ty: ty.clone() }))?;
         generate_print(ty, fmt, ctx)?;
     }
 
@@ -101,10 +95,9 @@ pub fn generate_custom_print(ty: Type, code: CCode, ctx: &mut Context) -> Result
         span: Span::call_site(),
     };
 
-    let ident = quote::format_ident!("annabella_print_{}", ty.to_str());
-    let ty_ident = quote::format_ident!("{}", ty.to_str());
+    let ident = IdentBuilder::print(&ty);
     ctx.push_function(c_code! {
-        void #ident(#ty_ident self) {
+        void #ident(#ty self) {
             #code
         }
     });

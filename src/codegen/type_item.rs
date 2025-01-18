@@ -9,7 +9,7 @@ use crate::{
 
 use super::{
     standard, CCode, CodeGenExpr, CodeGenStmt, Context, EnumType, FunctionType, FunctionValue,
-    SubtypeType, Type, TypeValue, Value,
+    IdentBuilder, SubtypeType, Type, TypeValue, Value,
 };
 
 impl CodeGenStmt for TypeItem {
@@ -40,26 +40,28 @@ impl CodeGenType for TypeDefinition {
 
 impl CodeGenType for EnumTypeDefinition {
     fn generate(&self, name: &Ident, ctx: &mut Context) -> Result<CCode> {
+        let ident = IdentBuilder::type_(name);
         ctx.push_type(c_code! {
-            typedef int #name;
+            typedef int #ident;
         });
 
         let ty = Type::enum_(EnumType {
             name: name.clone(),
+            ident: ident.clone(),
             values: self.values.iter().cloned().collect(),
         });
 
         for (i, value) in self.values.iter().enumerate() {
-            let ident = quote::format_ident!("annabella__{name}__{value}");
+            let value_ident = IdentBuilder::enum_value(name, value);
             ctx.push_function(c_code! {
-                #name #ident() {
+                #ident #value_ident() {
                     return #i;
                 }
             });
             ctx.insert(
                 value,
                 Value::Function(FunctionValue::new(
-                    c_code! { #ident },
+                    c_code! { #value_ident},
                     Type::function(FunctionType {
                         args: vec![],
                         return_type: ty.clone(),
@@ -68,13 +70,7 @@ impl CodeGenType for EnumTypeDefinition {
             )?;
         }
 
-        ctx.insert(
-            name,
-            Value::Type(TypeValue {
-                name: c_code! { #name },
-                ty: ty.clone(),
-            }),
-        )?;
+        ctx.insert(name, Value::Type(TypeValue { ty: ty.clone() }))?;
 
         let values_str = self.values.iter().map(|v| &*v.name);
         standard::generate_custom_print(
@@ -104,8 +100,7 @@ impl CodeGenStmt for SubtypeItem {
             .transpose()?;
 
         let constraint_check = if let Some(constraint) = constraint {
-            let ident = quote::format_ident!("annabella_constraint__{name}");
-
+            let ident = IdentBuilder::constraint_check(name);
             ctx.push_function(c_code! {
                 #parent #ident(#parent self) {
                     #constraint
@@ -121,14 +116,7 @@ impl CodeGenStmt for SubtypeItem {
             parent,
             constraint_check,
         });
-        let c_name = quote::format_ident!("{}", ty.to_str());
-        ctx.insert(
-            name,
-            Value::Type(TypeValue {
-                name: c_code! { #c_name},
-                ty,
-            }),
-        )?;
+        ctx.insert(name, Value::Type(TypeValue { ty }))?;
 
         Ok(c_code!())
     }

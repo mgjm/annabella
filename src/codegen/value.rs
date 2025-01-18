@@ -103,7 +103,6 @@ struct FunctionOverload {
 
 #[derive(Debug)]
 pub struct TypeValue {
-    pub name: CCode,
     pub ty: Type,
 }
 

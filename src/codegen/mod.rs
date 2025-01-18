@@ -2,7 +2,7 @@ use quote::ToTokens;
 
 use crate::{
     parser::Item,
-    tokenizer::{Ident, Spanned},
+    tokenizer::{Ident, Span, Spanned},
     Result,
 };
 
@@ -11,6 +11,7 @@ mod c_code;
 
 mod context;
 mod expr;
+mod ident;
 mod item;
 mod standard;
 mod stmt;
@@ -18,7 +19,7 @@ mod ty;
 mod type_item;
 mod value;
 
-pub use self::{c_code::CCode, context::Context, ty::*, value::*};
+pub use self::{c_code::CCode, context::Context, ident::IdentBuilder, ty::*, value::*};
 
 pub fn run(items: Vec<Item>) -> Result<String> {
     let mut ctx = Context::base();
@@ -30,10 +31,21 @@ pub fn run(items: Vec<Item>) -> Result<String> {
         let code = item.generate(ctx)?;
         ctx.push_main(code);
     }
-    ctx.push_main(c_code! { annabella_Main_(); });
 
-    // dbg!(&**ctx);
-    // todo!();
+    let ident = Ident {
+        name: "Main".into(),
+        span: Span::call_site(),
+    };
+    let Some(ExprValue::Distinct(value)) = ctx.get(&ident)?.expr_value().filter(|value| {
+        matches!(
+            value.ty.as_function(),
+            Some(ty) if ty.args.is_empty() && ty.return_type.is_void(),
+        )
+    }) else {
+        return Err(ident.unrecoverable_error("main function not found"));
+    };
+    ctx.push_main(c_code! { #value(); });
+
     Ok(ctx.to_string())
 }
 

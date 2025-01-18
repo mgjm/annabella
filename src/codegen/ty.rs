@@ -134,7 +134,17 @@ impl Type {
 
 impl ToTokens for Type {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        proc_macro2::Ident::new(self.to_str(), proc_macro2::Span::call_site()).to_tokens(tokens)
+        let new_ident = || proc_macro2::Ident::new(self.to_str(), proc_macro2::Span::call_site());
+        match self.inner() {
+            Inner::Void => new_ident().to_tokens(tokens),
+            Inner::Boolean => new_ident().to_tokens(tokens),
+            Inner::Character => new_ident().to_tokens(tokens),
+            Inner::Integer => new_ident().to_tokens(tokens),
+            Inner::String => new_ident().to_tokens(tokens),
+            Inner::Function(_) => new_ident().to_tokens(tokens),
+            Inner::Enum(ty) => ty.ident.to_tokens(tokens),
+            Inner::Subtype(ty) => ty.parent().to_tokens(tokens),
+        }
     }
 }
 
@@ -185,6 +195,7 @@ impl TypeImpl for FunctionType {
 #[derive(Debug, PartialEq, Eq)]
 pub struct EnumType {
     pub name: Ident,
+    pub ident: proc_macro2::Ident,
     pub values: Vec<Ident>,
 }
 
@@ -212,7 +223,6 @@ impl TypeImpl for EnumType {
 
 #[derive(Debug)]
 pub struct SubtypeType {
-    // pub name: Ident,
     pub parent: Type,
     pub constraint_check: Option<CCode>,
 }
