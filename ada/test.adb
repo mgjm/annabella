@@ -134,5 +134,16 @@ begin
    b := b < false;
    Print(b);
 
+   Print("Start of if:");
+   if i < 3 then
+      Print("if");
+   elsif Test > 5 then
+      Print("elif");
+   elsif true then
+      Print("elif2");
+   else
+      Print("else");
+   end if;
+
    Print("End");
 end;
