@@ -169,14 +169,14 @@ where
         Ok(Self { inner })
     }
 
-    // fn parse(input: super::ParseStream) -> Result<Self> {
-    //     let mut inner = vec![(input.parse()?, None)];
-    //     while let Some(punct) = input.try_parse()? {
-    //         inner.last_mut().unwrap().1 = Some(punct);
-    //         inner.push((input.parse()?, None));
-    //     }
-    //     Ok(Self { inner })
-    // }
+    pub fn parse_while(input: super::ParseStream) -> Result<Self> {
+        let mut inner = vec![(input.parse()?, None)];
+        while let Some(punct) = input.try_parse()? {
+            inner.last_mut().unwrap().1 = Some(punct);
+            inner.push((input.parse()?, None));
+        }
+        Ok(Self { inner })
+    }
 }
 
 impl<T, P> Punctuated<T, P> {

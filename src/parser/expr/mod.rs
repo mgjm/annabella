@@ -3,7 +3,7 @@ use crate::{
     Result, Token,
 };
 
-use super::{Parenthesized, ParenthesizedOne, Parse, ParseStream};
+use super::{Parenthesized, ParenthesizedOne, Parse, ParseStream, Range};
 
 parse!({
     enum Expr {
@@ -105,26 +105,32 @@ impl Expr {
             }
         }
 
-        let op = if let Some(op) = input.try_parse()? {
-            BinaryOp::Eq(op)
-        } else if let Some(op) = input.try_parse()? {
-            BinaryOp::Ne(op)
-        } else if let Some(op) = input.try_parse()? {
-            BinaryOp::Le(op)
-        } else if let Some(op) = input.try_parse()? {
-            BinaryOp::Ge(op)
-        } else if let Some(op) = input.try_parse()? {
-            BinaryOp::Lt(op)
-        } else if let Some(op) = input.try_parse()? {
-            BinaryOp::Gt(op)
-        } else {
+        let Some((op, rhs)) = input.try_call(|input| {
+            let op = if let Some(op) = input.try_parse()? {
+                BinaryOp::Eq(op)
+            } else if let Some(op) = input.try_parse()? {
+                BinaryOp::Ne(op)
+            } else if let Some(op) = input.try_parse()? {
+                BinaryOp::Le(op)
+            } else if let Some(op) = input.try_parse()? {
+                BinaryOp::Ge(op)
+            } else if let Some(op) = input.try_parse()? {
+                BinaryOp::Lt(op)
+            } else if let Some(op) = input.try_parse()? {
+                BinaryOp::Gt(op)
+            } else {
+                return Err(input.recoverable_error("expected relation operator"));
+            };
+            let rhs = Self::parse_simple_expression(input)?;
+            Ok((op, rhs))
+        })?
+        else {
             return Ok(expr);
         };
-
         Ok(Self::Binary(ExprBinary {
             lhs: expr.into(),
             op,
-            rhs: Self::parse_simple_expression(input)?.into(),
+            rhs: rhs.into(),
         }))
     }
 
@@ -207,7 +213,7 @@ impl Expr {
             }
             return Ok(expr);
         } else {
-            return Err(input.unrecoverable_error("expected factor"));
+            return Err(input.recoverable_error("expected factor"));
         };
 
         Ok(Self::Unary(ExprUnary {
@@ -230,7 +236,7 @@ impl Expr {
                 Self::Name(name)
             }
         } else {
-            return Err(input.unrecoverable_error("expected primary"));
+            return Err(input.recoverable_error("expected primary"));
         })
     }
 }
@@ -508,3 +514,25 @@ parse!({
         else_: Token![else],
     }
 });
+
+parse!({
+    enum DiscreteChoice {
+        Others(Token![others]),
+        Expr(Expr),
+        Range(Range),
+    }
+});
+
+impl Parse for DiscreteChoice {
+    fn parse(input: ParseStream) -> crate::Result<Self> {
+        Ok(if let Some(choice) = input.try_parse()? {
+            Self::Others(choice)
+        } else if let Some(choice) = input.try_parse()? {
+            Self::Range(choice)
+        } else if let Some(choice) = input.try_parse()? {
+            Self::Expr(choice)
+        } else {
+            return Err(input.recoverable_error("expected discrete choice"));
+        })
+    }
+}

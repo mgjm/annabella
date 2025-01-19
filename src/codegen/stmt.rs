@@ -1,8 +1,8 @@
 use crate::{
     codegen::IdentBuilder,
     parser::{
-        AssignStmt, BlockStmt, ExitStmt, ExprStmt, GotoStmt, IfStmt, LabelStmt, LoopScheme,
-        LoopStmt, ReturnStmt, Stmt,
+        AssignStmt, BlockStmt, CaseStmt, DiscreteChoice, ExitStmt, ExprStmt, GotoStmt, IfStmt,
+        LabelStmt, LoopScheme, LoopStmt, ReturnStmt, Stmt,
     },
     tokenizer::Spanned,
     Result,
@@ -24,6 +24,7 @@ impl CodeGenStmt for Stmt {
             Self::Goto(stmt) => stmt.generate(ctx),
             Self::Loop(stmt) => stmt.generate(ctx),
             Self::Exit(stmt) => stmt.generate(ctx),
+            Self::Case(stmt) => stmt.generate(ctx),
         }
     }
 }
@@ -282,6 +283,62 @@ impl CodeGenStmt for ExitStmt {
         } else {
             c_code! {
                 break;
+            }
+        })
+    }
+}
+
+impl CodeGenStmt for CaseStmt {
+    fn generate(&self, ctx: &mut Context) -> Result<CCode> {
+        let ExprValue::Distinct(expr) = self.expr.generate(ctx)? else {
+            return Err(self.expr.unrecoverable_error("ambiguous case expression"));
+        };
+        let ty = expr.ty;
+        let expr = expr.code;
+        let alternatives = self
+            .alternatives
+            .iter()
+            .map(|alt| {
+                let choices = alt
+                    .choices
+                    .iter()
+                    .map(|choice| choice.generate(&ty, ctx))
+                    .collect::<Result<Vec<_>>>()?;
+
+                let stmts = alt
+                    .stmts
+                    .iter()
+                    .map(|stmt| stmt.generate(ctx))
+                    .collect::<Result<Vec<_>>>()?;
+
+                Ok(c_code! {
+                    if (#(#choices)||*) {
+                        #(#stmts)*
+                    } else
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        Ok(c_code! {
+            {
+                #ty case_expr = #expr;
+                #(#alternatives)* {}
+            }
+        })
+    }
+}
+
+impl DiscreteChoice {
+    fn generate(&self, ty: &Type, ctx: &mut Context) -> Result<CCode> {
+        Ok(match self {
+            Self::Others(_) => c_code! { 1 },
+            Self::Expr(expr) => {
+                let expr = expr.generate_with_type_and_check(ty, ctx)?;
+                c_code! { case_expr == #expr }
+            }
+            Self::Range(range) => {
+                let start = range.start.generate_with_type_and_check(ty, ctx)?;
+                let end = range.end.generate_with_type_and_check(ty, ctx)?;
+                c_code! { (case_expr >= #start && case_expr <= #end) }
             }
         })
     }

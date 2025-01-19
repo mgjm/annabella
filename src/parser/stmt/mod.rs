@@ -3,7 +3,7 @@ use crate::{
     Result, Token,
 };
 
-use super::{Expr, Item, Name, Parse, ParseStream, Range};
+use super::{DiscreteChoice, Expr, Item, Name, Parse, ParseStream, Punctuated, Range};
 
 parse!({
     enum Stmt {
@@ -16,6 +16,7 @@ parse!({
         Goto(GotoStmt),
         Loop(LoopStmt),
         Exit(ExitStmt),
+        Case(CaseStmt),
     }
 });
 
@@ -31,6 +32,8 @@ impl Parse for Stmt {
             Self::Goto(stmt)
         } else if let Some(stmt) = input.try_parse()? {
             Self::Exit(stmt)
+        } else if let Some(stmt) = input.try_parse()? {
+            Self::Case(stmt)
         } else if let Some(stmt) = input.try_parse()? {
             Self::Loop(stmt)
         } else if let Some(stmt) = input.try_parse()? {
@@ -437,6 +440,73 @@ impl Parse for ExitStmt {
                     input.unrecoverable(|input| Ok((when, input.parse()?)))
                 })?,
                 semi: input.parse()?,
+            })
+        })
+    }
+}
+
+parse!({
+    struct CaseStmt {
+        case: Token![case],
+        expr: Expr,
+        is_: Token![is],
+        alternatives: Vec<CaseStmtAlternative>,
+        end: Token![end],
+        semi: Token![;],
+    }
+});
+
+impl Parse for CaseStmt {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let case = input.parse()?;
+        input.unrecoverable(|input| {
+            let expr = input.parse()?;
+            let is_ = input.parse()?;
+            let mut alternatives: Vec<CaseStmtAlternative> = vec![input.parse()?];
+            {
+                let mut vec = &mut alternatives.last_mut().unwrap().stmts;
+
+                while !input.peek(Token![end]) {
+                    if let Some(alt) = input.try_parse()? {
+                        alternatives.push(alt);
+                        vec = &mut alternatives.last_mut().unwrap().stmts;
+                    } else {
+                        vec.push(input.parse()?);
+                    }
+                }
+            }
+            let end = input.parse()?;
+            let _: Token![case] = input.parse()?;
+            let semi = input.parse()?;
+            Ok(Self {
+                case,
+                expr,
+                is_,
+                alternatives,
+                end,
+                semi,
+            })
+        })
+    }
+}
+parse!({
+    struct CaseStmtAlternative {
+        when: Token![when],
+        choices: Punctuated<DiscreteChoice, Token![|]>,
+        arrow: Token![=>],
+        stmts: Vec<Stmt>,
+    }
+});
+
+impl Parse for CaseStmtAlternative {
+    fn parse(input: ParseStream) -> crate::Result<Self> {
+        let when = input.parse()?;
+        input.unrecoverable(|input| {
+            Ok(Self {
+                when,
+                choices: input.call(Punctuated::parse_while)?,
+                arrow: input.parse()?,
+                stmts: vec![input.parse()?],
             })
         })
     }

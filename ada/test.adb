@@ -195,5 +195,16 @@ Swap:
       Print(i);
    end loop;
 
+
+   for d in Mon .. Sun loop
+      Print(d);
+      case d is
+         when Mon => Print("start of week");
+         when Fri => Print("ready for weekend");
+         when Tue .. Thu => Print("work time");
+         when others => Print("free time");
+      end case;
+   end loop;
+
    Print("End");
 end;
