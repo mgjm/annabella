@@ -43,19 +43,9 @@ fn generate_integer(ctx: &mut Context) -> Result<()> {
     SignedTypeDefinition {
         range_keyword: Default::default(),
         range: Range {
-            start: Expr::Lit(ExprLit::Number(LitNumber {
-                lit: crate::tokenizer::Literal {
-                    str: i16::MIN.to_string().into(),
-                    span: Span::call_site(),
-                },
-            })),
+            start: Expr::number(i32::MIN),
             dot_dot: Default::default(),
-            end: Expr::Lit(ExprLit::Number(LitNumber {
-                lit: crate::tokenizer::Literal {
-                    str: i16::MAX.to_string().into(),
-                    span: Span::call_site(),
-                },
-            })),
+            end: Expr::number(i32::MAX),
         },
     }
     .generate(&ident, ctx)?;
@@ -108,6 +98,56 @@ pub(crate) fn generate_signed_ops(ty: &Type, ctx: &mut Context) -> Result<()> {
         and &
         or |
         xor ^
+    }
+
+    Ok(())
+}
+
+pub(crate) fn generate_modular_ops(ty: &Type, modulus: &CCode, ctx: &mut Context) -> Result<()> {
+    macro_rules! integer_ops {
+        ($($ada:tt $c:tt {$($($map:tt)+)?})*) => {
+            $(
+                let op: Token![$ada] = Default::default();
+                let ident = IdentBuilder::op_function(op, ty);
+                let code = c_code! { (lhs $c rhs) };
+                $(
+                    let code = c_code! { (#code $($map)*) };
+                )?
+                ctx.push_function(c_code! {
+                    #ty #ident(#ty lhs, #ty rhs) {
+                        return #code % #modulus;
+                    }
+                });
+
+                ctx.insert(
+                    &op.operator_symbol(),
+                    Value::Function(FunctionValue::new(
+                         c_code! { #ident },
+                         Type::function(FunctionType {
+                            args: vec![ty.clone(), ty.clone()],
+                            return_type: ty.clone(),
+                        })
+                    )),
+                )?;
+
+            )*
+        };
+    }
+
+    integer_ops! {
+        + + {}
+        - - { + #modulus}
+        * * {}
+        / / {}
+        = == {}
+        /= != {}
+        < < {}
+        <= <= {}
+        > > {}
+        >= >= {}
+        and & {}
+        or | {}
+        xor ^ {}
     }
 
     Ok(())

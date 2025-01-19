@@ -171,6 +171,7 @@ parse!({
     enum TypeDefinition {
         Enum(EnumTypeDefinition),
         Signed(SignedTypeDefinition),
+        Modular(ModularTypeDefinition),
     }
 });
 
@@ -178,6 +179,8 @@ impl Parse for TypeDefinition {
     fn parse(input: ParseStream) -> Result<Self> {
         Ok(if let Some(td) = input.try_parse()? {
             Self::Signed(td)
+        } else if let Some(td) = input.try_parse()? {
+            Self::Modular(td)
         } else if let Some(td) = input.try_parse()? {
             Self::Enum(td)
         } else {
@@ -214,6 +217,25 @@ impl Parse for SignedTypeDefinition {
             Ok(Self {
                 range_keyword,
                 range: input.parse()?,
+            })
+        })
+    }
+}
+
+parse!({
+    struct ModularTypeDefinition {
+        mod_: Token![mod],
+        modulus: Expr,
+    }
+});
+
+impl Parse for ModularTypeDefinition {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let mod_ = input.parse()?;
+        input.unrecoverable(|input| {
+            Ok(Self {
+                mod_,
+                modulus: input.parse()?,
             })
         })
     }

@@ -1,9 +1,10 @@
 use crate::{
     parser::{
-        Constraint, EnumTypeDefinition, FullTypeItem, RangeConstraint, SignedTypeDefinition,
-        SubtypeItem, TypeDefinition, TypeItem,
+        Constraint, EnumTypeDefinition, Expr, ExprLit, FullTypeItem, LitNumber,
+        ModularTypeDefinition, Range, RangeConstraint, SignedTypeDefinition, SubtypeItem,
+        TypeDefinition, TypeItem,
     },
-    tokenizer::Ident,
+    tokenizer::{Ident, Span},
     Result,
 };
 
@@ -29,8 +30,9 @@ impl CodeGenStmt for FullTypeItem {
 impl CodeGenType for TypeDefinition {
     fn generate(&self, name: &Ident, ctx: &mut Context) -> Result<CCode> {
         match self {
-            TypeDefinition::Enum(definition) => definition.generate(name, ctx),
-            TypeDefinition::Signed(definition) => definition.generate(name, ctx),
+            Self::Enum(definition) => definition.generate(name, ctx),
+            Self::Signed(definition) => definition.generate(name, ctx),
+            Self::Modular(definition) => definition.generate(name, ctx),
         }
     }
 }
@@ -118,6 +120,53 @@ impl CodeGenType for SignedTypeDefinition {
         ctx.insert(name, Value::Type(TypeValue { ty: ty.clone() }))?;
 
         standard::generate_signed_ops(&ty, ctx)?;
+        standard::generate_print(ty, "%ld", ctx)?;
+
+        Ok(c_code!())
+    }
+}
+
+impl CodeGenType for ModularTypeDefinition {
+    fn generate(&self, name: &Ident, ctx: &mut Context) -> Result<CCode> {
+        let ident = IdentBuilder::type_(name);
+
+        ctx.push_type(c_code! {
+            typedef ssize_t #ident;
+        });
+
+        let constraint_check = {
+            let constraint = RangeConstraint {
+                range_token: Default::default(),
+                range: Range {
+                    start: Expr::number(0),
+                    dot_dot: Default::default(),
+                    end: self.modulus.clone(),
+                },
+            }
+            .generate(&Type::integer(), ctx)?;
+            let constraint_ident = IdentBuilder::constraint_check(name);
+            ctx.push_function(c_code! {
+                #ident #constraint_ident (#ident self) {
+                    #constraint
+                    return self;
+                }
+            });
+            Some(c_code! { #constraint_ident})
+        };
+
+        let ty = Type::signed(SignedType {
+            name: name.clone(),
+            ident: ident.clone(),
+            constraint_check,
+        });
+
+        ctx.insert(name, Value::Type(TypeValue { ty: ty.clone() }))?;
+
+        let modulus = self
+            .modulus
+            .generate_with_type_and_check(&Type::integer(), ctx)?;
+
+        standard::generate_modular_ops(&ty, &modulus, ctx)?;
         standard::generate_print(ty, "%ld", ctx)?;
 
         Ok(c_code!())

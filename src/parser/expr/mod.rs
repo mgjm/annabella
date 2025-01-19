@@ -23,6 +23,15 @@ impl Parse for Expr {
 }
 
 impl Expr {
+    pub fn number(value: impl ToString) -> Self {
+        Self::Lit(ExprLit::Number(LitNumber {
+            lit: Literal {
+                str: value.to_string().into(),
+                span: Span::call_site(),
+            },
+        }))
+    }
+
     fn parse_expression(input: ParseStream) -> Result<Self> {
         use helper::LogicalOp;
 

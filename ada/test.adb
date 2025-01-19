@@ -44,8 +44,8 @@ end;
 
 type Meter is range 0 .. 1_000_000;
 type Inch is range 0 .. 123;
-subtype Minute is Integer range 0 .. 59;
-subtype SmallMinute is Minute range 0 .. 11;
+type Byte is mod 256;
+type Minute is mod 60;
 
 -- function "+"(lhs: Meter; rhs: Meter) return Meter is
 -- begin
@@ -83,6 +83,7 @@ procedure Main is
    wd: Weekday;
    m: Meter;
    i: Inch;
+   min: Minute;
 begin
    Print("Start");
    Print("Hello \n World""");
@@ -116,7 +117,9 @@ begin
    Print(Weekend'(Sat));
    -- Print(Weekday'(Sat)); --> Constraint_Error
 
-   Print(Minute'(Integer'(SmallMinute'(5))));
+
+   min := 5;
+   Print(min + 5 / 3 * 59);
    
    Print("End");
 end;
