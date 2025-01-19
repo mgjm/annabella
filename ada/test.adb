@@ -137,7 +137,7 @@ begin
    Print("Start of if:");
    if i < 3 then
       Print("if");
-   elsif Test > 5 then
+   elsif true or else Test > 5 then
       Print("elif");
    elsif true then
       Print("elif2");

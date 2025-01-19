@@ -1,7 +1,8 @@
 use crate::{
     parser::{
-        BaseName, BinaryOp, Expr, ExprBinary, ExprLit, FunctionCall, LitChar, LitNumber, LitStr,
-        Name, QualifiedExpr, QualifiedExprValue, QualifiedExprValueExpr,
+        BaseName, BinaryOp, Expr, ExprBinary, ExprLit, ExprShortCircuit, FunctionCall, LitChar,
+        LitNumber, LitStr, Name, QualifiedExpr, QualifiedExprValue, QualifiedExprValueExpr,
+        ShortCircuitOp,
     },
     tokenizer::{Ident, Span, Spanned},
     Result,
@@ -18,7 +19,7 @@ impl CodeGenExpr for Expr {
             Self::Qualified(expr) => expr.generate(ctx),
             Self::Unary(expr) => todo!(),
             Self::Binary(expr) => expr.generate(ctx),
-            Self::ShortCircuit(expr) => todo!(),
+            Self::ShortCircuit(expr) => expr.generate(ctx),
         }
     }
 }
@@ -206,6 +207,26 @@ impl CodeGenExpr for ExprBinary {
             [&*self.lhs, &*self.rhs].into_iter(),
             ctx,
         )
+    }
+}
+
+impl CodeGenExpr for ExprShortCircuit {
+    fn generate(&self, ctx: &mut Context) -> Result<ExprValue> {
+        let boolean = Type::boolean(ctx)?;
+
+        let lhs = self.lhs.generate_with_type_and_check(&boolean, ctx)?;
+        let rhs = self.rhs.generate_with_type_and_check(&boolean, ctx)?;
+        let op = match self.op {
+            ShortCircuitOp::And(_) => c_code! { && },
+            ShortCircuitOp::Or(_) => c_code! { || },
+        };
+
+        Ok(SingleExprValue {
+            ty: boolean,
+            code: c_code! { #lhs #op #rhs },
+            value: None,
+        }
+        .into())
     }
 }
 
