@@ -53,7 +53,7 @@ pub enum Value {
 impl Value {
     fn insert(&mut self, ident: &Ident, value: Self) -> Result<()> {
         let (Self::Function(this), Self::Function(other)) = (self, value) else {
-            return Err(ident.unrecoverable_error("identifier already inuse"));
+            return Err(ident.unrecoverable_error("identifier already in use"));
         };
         this.insert(ident, other)
     }

@@ -3,17 +3,18 @@ use crate::{
     Result, Token,
 };
 
-use super::{Parenthesized, Parse, ParseStream};
+use super::{Parenthesized, ParenthesizedOne, Parse, ParseStream};
 
-parse! {
+parse!({
     enum Expr {
         Lit(ExprLit),
         Name(Name),
+        Qualified(QualifiedExpr),
         Unary(ExprUnary),
         Binary(ExprBinary),
         ShortCircuit(ExprShortCircuit),
     }
-}
+});
 
 impl Parse for Expr {
     fn parse(input: ParseStream) -> Result<Self> {
@@ -210,20 +211,28 @@ impl Expr {
         Ok(if let Some(lit) = input.try_parse()? {
             Self::Lit(lit)
         } else if let Some(name) = input.try_parse()? {
-            Self::Name(name)
+            if let Some(tick) = input.try_parse()? {
+                Self::Qualified(QualifiedExpr {
+                    mark: name,
+                    tick,
+                    value: input.parse()?,
+                })
+            } else {
+                Self::Name(name)
+            }
         } else {
             return Err(input.unrecoverable_error("expected primary"));
         })
     }
 }
 
-parse! {
+parse!({
     enum ExprLit {
         Str(LitStr),
         Char(LitChar),
         Number(LitNumber),
     }
-}
+});
 
 impl Parse for ExprLit {
     fn parse(input: ParseStream) -> Result<Self> {
@@ -245,11 +254,11 @@ impl Parse for ExprLit {
     }
 }
 
-parse! {
+parse!({
     struct LitStr {
         lit: Literal,
     }
-}
+});
 
 impl LitStr {
     pub fn str(&self) -> String {
@@ -263,11 +272,11 @@ impl LitStr {
     }
 }
 
-parse! {
+parse!({
     struct LitChar {
         lit: Literal,
     }
-}
+});
 
 impl LitChar {
     pub fn char(&self) -> char {
@@ -285,11 +294,11 @@ impl LitChar {
     }
 }
 
-parse! {
+parse!({
     struct LitNumber {
         lit: Literal,
     }
-}
+});
 
 impl LitNumber {
     pub fn number<T>(&self) -> T
@@ -330,12 +339,12 @@ impl ParseNumber for i64 {
     }
 }
 
-parse! {
+parse!({
     enum Name {
         Base(BaseName),
         FunctionCall(FunctionCall),
     }
-}
+});
 
 impl Parse for Name {
     fn parse(input: ParseStream) -> Result<Self> {
@@ -353,11 +362,11 @@ impl Parse for Name {
     }
 }
 
-parse! {
+parse!({
     enum BaseName {
         Ident(Ident),
     }
-}
+});
 
 impl Parse for BaseName {
     fn parse(input: ParseStream) -> Result<Self> {
@@ -365,38 +374,72 @@ impl Parse for BaseName {
     }
 }
 
-parse! {
+parse!({
+    struct QualifiedExpr {
+        mark: Name,
+        tick: Token![tick],
+        value: QualifiedExprValue,
+    }
+});
+
+parse!({
+    enum QualifiedExprValue {
+        Expr(QualifiedExprValueExpr),
+    }
+});
+
+impl Parse for QualifiedExprValue {
+    fn parse(input: ParseStream) -> crate::Result<Self> {
+        Ok(Self::Expr(input.parse()?))
+    }
+}
+
+parse!({
+    struct QualifiedExprValueExpr {
+        expr: ParenthesizedOne<Box<Expr>>,
+    }
+});
+
+impl Parse for QualifiedExprValueExpr {
+    fn parse(input: ParseStream) -> crate::Result<Self> {
+        Ok(Self {
+            expr: input.parse()?,
+        })
+    }
+}
+
+parse!({
     struct FunctionCall {
         name: Box<Name>,
         args: Parenthesized<Expr>,
     }
-}
+});
 
-parse! {
+parse!({
     struct ExprUnary {
         op: UnaryOp,
         expr: Box<Expr>,
     }
-}
+});
 
-parse! {
+parse!({
     enum UnaryOp {
         Abs(Token![abs]),
         Not(Token![not]),
         Add(Token![+]),
         Sub(Token![-]),
     }
-}
+});
 
-parse! {
+parse!({
     struct ExprBinary {
         lhs: Box<Expr>,
         op: BinaryOp,
         rhs: Box<Expr>,
     }
-}
+});
 
-parse! {
+parse!({
     enum BinaryOp {
         Pow(Token![**]),
         Mul(Token![*]),
@@ -416,43 +459,43 @@ parse! {
         Or(Token![or]),
         Xor(Token![xor]),
     }
-}
+});
 
-parse! {
+parse!({
     struct ExprShortCircuit {
         lhs: Box<Expr>,
         op: ShortCircuitOp,
         rhs: Box<Expr>,
     }
-}
+});
 
 mod helper {
     use super::*;
-    parse! {
+    parse!({
         enum LogicalOp {
             Binary(BinaryOp),
             ShortCircuit(ShortCircuitOp),
         }
-    }
+    });
 }
 
-parse! {
+parse!({
     enum ShortCircuitOp {
         And(AndThen),
         Or(OrElse),
     }
-}
+});
 
-parse! {
+parse!({
     struct AndThen {
         and: Token![and],
         then: Token![then],
     }
-}
+});
 
-parse! {
+parse!({
     struct OrElse {
         or: Token![or],
         else_: Token![else],
     }
-}
+});

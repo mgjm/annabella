@@ -8,23 +8,22 @@ use crate::{
 use super::{Parse, ParseStream, Result};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Parenthesized<T, P = Token![,]> {
+pub struct ParenthesizedOne<T> {
     pub paren: Paren,
-    pub inner: Punctuated<T, P>,
+    pub inner: T,
 }
 
-impl<T, P> Deref for Parenthesized<T, P> {
-    type Target = Punctuated<T, P>;
+impl<T> Deref for ParenthesizedOne<T> {
+    type Target = T;
 
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
 }
 
-impl<T, P> Spanned for Parenthesized<T, P>
+impl<T> Spanned for ParenthesizedOne<T>
 where
     T: Spanned,
-    P: Spanned,
 {
     fn span(&self) -> Span {
         let mut span = Span::call_site();
@@ -34,14 +33,13 @@ where
     }
 }
 
-impl<T, P> Parse for Parenthesized<T, P>
-where
-    T: Parse,
-    P: Parse,
-{
-    fn parse(input: super::ParseStream) -> Result<Self> {
+impl<T> ParenthesizedOne<T> {
+    fn parse_with(
+        input: ParseStream,
+        parse: impl FnOnce(ParseStream) -> Result<T>,
+    ) -> Result<Self> {
         let (paren, inner) = Paren::parse_inner(input)?;
-        match super::parse_with(inner, |input| input.unrecoverable(Punctuated::parse_all)) {
+        match super::parse_with(inner, |input| input.unrecoverable(parse)) {
             Ok(inner) => Ok(Self { paren, inner }),
             Err(mut err) => {
                 if err.span.is_call_site() {
@@ -50,6 +48,27 @@ where
                 Err(err)
             }
         }
+    }
+}
+
+impl<T> Parse for ParenthesizedOne<T>
+where
+    T: Parse,
+{
+    fn parse(input: ParseStream) -> Result<Self> {
+        Self::parse_with(input, T::parse)
+    }
+}
+
+pub type Parenthesized<T, P = Token![,]> = ParenthesizedOne<Punctuated<T, P>>;
+
+impl<T, P> Parse for Parenthesized<T, P>
+where
+    T: Parse,
+    P: Parse,
+{
+    fn parse(input: ParseStream) -> Result<Self> {
+        Self::parse_with(input, Punctuated::parse_all)
     }
 }
 
@@ -140,7 +159,7 @@ where
     T: Parse,
     P: Parse,
 {
-    fn parse_all(input: super::ParseStream) -> Result<Self> {
+    fn parse_all(input: ParseStream) -> Result<Self> {
         let mut inner = vec![(input.parse()?, None)];
 
         while !input.is_empty() {

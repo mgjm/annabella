@@ -106,6 +106,13 @@ begin
    i := 3;
    i := i + 120;
    Print(i);
+
+   Print(Inch'(123));
+   Print(Meter'(123));
+   Print(Integer'(123));
+   Print(Sat);
+   Print(Day'(Sat));
+   -- Print(Weekday'(Sat)); --> Constraint_Error
    
    Print("End");
 end;

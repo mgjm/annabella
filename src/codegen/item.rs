@@ -43,12 +43,12 @@ impl CodeGenStmt for Function {
 
         let mut sub_ctx = ctx.subscope(
             self.return_type()
-                .map(|arg| Type::parse_ident(arg, ctx))
+                .map(|arg| Type::from_ident(arg, ctx))
                 .transpose()?,
         );
         for arg in self.args() {
             let name = &arg.name;
-            let ty = Type::parse_ident(&arg.ty, &sub_ctx)?;
+            let ty = Type::from_ident(&arg.ty, &sub_ctx)?;
             sub_ctx.insert(
                 &arg.name,
                 Value::Variable(VariableValue {
@@ -84,11 +84,11 @@ impl CodeGenStmt for Function {
 
         let args = self
             .args()
-            .map(|arg| Type::parse_ident(&arg.ty, ctx))
+            .map(|arg| Type::from_ident(&arg.ty, ctx))
             .collect::<Result<Vec<_>>>()?;
 
         let return_type = if let Some(ty) = self.return_type() {
-            Type::parse_ident(ty, ctx)?
+            Type::from_ident(ty, ctx)?
         } else {
             Type::void()
         };
@@ -107,7 +107,7 @@ impl CodeGenStmt for Function {
 impl CodeGenStmt for Variable {
     fn generate(&self, ctx: &mut Context) -> Result<CCode> {
         let name = &self.name;
-        let ty = Type::parse_ident(&self.ty, ctx)?;
+        let ty = Type::from_ident(&self.ty, ctx)?;
         ctx.insert(
             name,
             Value::Variable(VariableValue {

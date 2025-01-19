@@ -57,6 +57,7 @@ trait CodeGenType {
     fn generate(&self, name: &Ident, ctx: &mut Context) -> Result<CCode>;
 }
 
+#[derive(Debug)]
 enum ExprValue {
     Distinct(SingleExprValue),
     Ambiguous(Vec<SingleExprValue>),
@@ -194,6 +195,7 @@ impl From<SingleExprValue> for ExprValue {
     }
 }
 
+#[derive(Debug)]
 enum CompileTimeValue {
     Character(char),
     Boolean(bool),
@@ -201,6 +203,7 @@ enum CompileTimeValue {
     String(String),
 }
 
+#[derive(Debug)]
 struct SingleExprValue {
     ty: Type,
     code: CCode,
@@ -234,6 +237,10 @@ trait CodeGenExpr: Spanned {
         } else {
             Ok(expr.code)
         }
+    }
+
+    fn generate_type(&self, ctx: &mut Context) -> Result<Type> {
+        Err(self.unrecoverable_error(format!("not a type: {}", std::any::type_name::<Self>())))
     }
 }
 

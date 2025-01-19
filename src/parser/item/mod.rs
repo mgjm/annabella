@@ -5,14 +5,14 @@ use crate::{
 
 use super::{Expr, Parenthesized, Parse, ParseStream, Stmt};
 
-parse! {
+parse!({
     enum Item {
         Function(Function),
         Type(TypeItem),
         Subtype(SubtypeItem),
         Variable(Variable),
     }
-}
+});
 
 impl Parse for Item {
     fn parse(input: ParseStream) -> Result<Self> {
@@ -29,7 +29,7 @@ impl Parse for Item {
         })
     }
 }
-parse! {
+parse!({
     struct Function {
         kind: FunctionKind,
         name: Ident,
@@ -42,7 +42,7 @@ parse! {
         end: Token![end],
         semi: Token![;],
     }
-}
+});
 
 impl Function {
     pub fn args(&self) -> impl Iterator<Item = &Param> {
@@ -93,12 +93,12 @@ impl Parse for Function {
     }
 }
 
-parse! {
+parse!({
     enum FunctionKind {
         Procedure(Token![procedure]),
         Function(Token![function]),
     }
-}
+});
 
 impl Parse for FunctionKind {
     fn parse(input: ParseStream) -> Result<Self> {
@@ -112,13 +112,13 @@ impl Parse for FunctionKind {
     }
 }
 
-parse! {
+parse!({
     struct Param {
         name: Ident,
         colon: Token![:],
         ty: Ident,
     }
-}
+});
 
 impl Parse for Param {
     fn parse(input: ParseStream) -> Result<Self> {
@@ -130,11 +130,11 @@ impl Parse for Param {
     }
 }
 
-parse! {
+parse!({
     enum TypeItem {
         Full(FullTypeItem),
     }
-}
+});
 
 impl Parse for TypeItem {
     fn parse(input: ParseStream) -> Result<Self> {
@@ -142,7 +142,7 @@ impl Parse for TypeItem {
     }
 }
 
-parse! {
+parse!({
     struct FullTypeItem {
         type_: Token![type],
         name: Ident,
@@ -150,7 +150,7 @@ parse! {
         definition: TypeDefinition,
         semi: Token![;],
     }
-}
+});
 
 impl Parse for FullTypeItem {
     fn parse(input: ParseStream) -> Result<Self> {
@@ -219,7 +219,7 @@ impl Parse for SignedTypeDefinition {
     }
 }
 
-parse! {
+parse!({
     struct SubtypeItem {
         type_: Token![subtype],
         name: Ident,
@@ -228,7 +228,7 @@ parse! {
         constraint: Option<Constraint>,
         semi: Token![;],
     }
-}
+});
 
 impl Parse for SubtypeItem {
     fn parse(input: ParseStream) -> Result<Self> {
@@ -303,14 +303,14 @@ impl Parse for Range {
     }
 }
 
-parse! {
+parse!({
     struct Variable {
         name: Ident,
         colon: Token![:],
         ty: Ident,
         semi: Token![;],
     }
-}
+});
 
 impl Parse for Variable {
     fn parse(input: ParseStream) -> Result<Self> {

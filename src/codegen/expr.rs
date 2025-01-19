@@ -1,7 +1,7 @@
 use crate::{
     parser::{
         BaseName, BinaryOp, Expr, ExprBinary, ExprLit, FunctionCall, LitChar, LitNumber, LitStr,
-        Name,
+        Name, QualifiedExpr, QualifiedExprValue, QualifiedExprValueExpr,
     },
     tokenizer::{Ident, Span, Spanned},
     Result,
@@ -15,6 +15,7 @@ impl CodeGenExpr for Expr {
         match self {
             Self::Lit(expr) => expr.generate(ctx),
             Self::Name(expr) => expr.generate(ctx)?.implicit_dereference(ctx),
+            Self::Qualified(expr) => expr.generate(ctx),
             Self::Unary(expr) => todo!(),
             Self::Binary(expr) => expr.generate(ctx),
             Self::ShortCircuit(expr) => todo!(),
@@ -75,6 +76,13 @@ impl CodeGenExpr for Name {
             Self::FunctionCall(name) => name.generate(ctx),
         }
     }
+
+    fn generate_type(&self, ctx: &mut Context) -> Result<Type> {
+        match self {
+            Self::Base(name) => name.generate_type(ctx),
+            Self::FunctionCall(name) => name.generate_type(ctx),
+        }
+    }
 }
 
 impl CodeGenExpr for BaseName {
@@ -82,6 +90,39 @@ impl CodeGenExpr for BaseName {
         Ok(match self {
             BaseName::Ident(ident) => ctx.get(ident)?.expr_value(),
         })
+    }
+
+    fn generate_type(&self, ctx: &mut Context) -> Result<Type> {
+        Ok(match self {
+            Self::Ident(ident) => Type::from_ident(ident, ctx)?,
+        })
+    }
+}
+
+impl CodeGenExpr for QualifiedExpr {
+    fn generate(&self, ctx: &mut Context) -> Result<ExprValue> {
+        let ty = self.mark.generate_type(ctx)?;
+        let code = self.value.generate_with_type_and_check(&ty, ctx)?;
+        Ok(SingleExprValue {
+            ty,
+            code,
+            value: None,
+        }
+        .into())
+    }
+}
+
+impl CodeGenExpr for QualifiedExprValue {
+    fn generate(&self, ctx: &mut Context) -> Result<ExprValue> {
+        match self {
+            Self::Expr(expr) => expr.generate(ctx),
+        }
+    }
+}
+
+impl CodeGenExpr for QualifiedExprValueExpr {
+    fn generate(&self, ctx: &mut Context) -> Result<ExprValue> {
+        self.expr.generate(ctx)
     }
 }
 

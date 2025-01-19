@@ -5,13 +5,13 @@ use crate::{
 
 use super::{Expr, Name, Parse, ParseStream, Result};
 
-parse! {
+parse!({
     enum Stmt {
         Expr(ExprStmt),
         Return(ReturnStmt),
         Assign(AssignStmt),
     }
-}
+});
 
 impl Parse for Stmt {
     fn parse(input: ParseStream) -> Result<Self> {
@@ -25,12 +25,12 @@ impl Parse for Stmt {
     }
 }
 
-parse! {
+parse!({
     struct ExprStmt {
         expr: Expr,
         semi: Token![;],
     }
-}
+});
 
 impl Parse for ExprStmt {
     fn parse(input: ParseStream) -> Result<Self> {
@@ -41,13 +41,13 @@ impl Parse for ExprStmt {
     }
 }
 
-parse! {
+parse!({
     struct ReturnStmt {
-    return_: Token![return],
+        return_: Token![return],
         expr: Expr,
         semi: Token![;],
     }
-}
+});
 
 impl Parse for ReturnStmt {
     fn parse(input: ParseStream) -> Result<Self> {
@@ -62,14 +62,14 @@ impl Parse for ReturnStmt {
     }
 }
 
-parse! {
+parse!({
     struct AssignStmt {
         name: Name,
         assign: Token![:=],
         expr: Expr,
         semi: Token![;],
     }
-}
+});
 
 impl Parse for AssignStmt {
     fn parse(input: ParseStream) -> Result<Self> {

@@ -68,16 +68,16 @@ impl Type {
         Self::new(Inner::Subtype(ty))
     }
 
-    pub fn parse_ident(ident: &Ident, ctx: &Context) -> Result<Self> {
-        let value = Self::parse_ident_value(ident, ctx)?;
-        Ok(value.ty.clone())
+    pub fn from_ident(ident: &Ident, ctx: &Context) -> Result<Self> {
+        Self::from_value(ctx.get(ident)?)
+            .ok_or_else(|| ident.unrecoverable_error("not a type name"))
     }
 
-    pub fn parse_ident_value<'a>(ident: &Ident, ctx: &'a Context<'a>) -> Result<&'a TypeValue> {
-        let Value::Type(value) = ctx.get(ident)? else {
-            return Err(ident.unrecoverable_error("not a type name"));
+    pub fn from_value(value: &Value) -> Option<Self> {
+        let Value::Type(value) = value else {
+            return None;
         };
-        Ok(value)
+        Some(value.ty.clone())
     }
 
     fn inner(&self) -> &Inner {

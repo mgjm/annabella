@@ -127,7 +127,7 @@ impl CodeGenType for SignedTypeDefinition {
 impl CodeGenStmt for SubtypeItem {
     fn generate(&self, ctx: &mut Context) -> Result<CCode> {
         let name = &self.name;
-        let parent = Type::parse_ident(&self.mark, ctx)?;
+        let parent = Type::from_ident(&self.mark, ctx)?;
 
         let constraint = self
             .constraint

@@ -1,12 +1,9 @@
 macro_rules! parse {
-    ({ $($tt:tt)* }) => {
-          parse! { $($tt)* }
-    };
-    (
+    ({
         enum $ident:ident {
             $($var:ident($ty:ty),)*
         }
-    ) => {
+    }) => {
         #[derive(Debug, Clone, PartialEq, Eq)]
         pub enum $ident {
             $($var($ty),)*
@@ -20,11 +17,11 @@ macro_rules! parse {
             }
         }
     };
-    (
+    ({
         struct $ident:ident {
             $($name:ident: $ty:ty,)*
         }
-    ) => {
+    }) => {
         #[derive(Debug, Clone, PartialEq, Eq)]
         pub struct $ident {
             $(pub $name: $ty,)*
