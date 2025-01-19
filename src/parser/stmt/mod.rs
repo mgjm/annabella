@@ -7,27 +7,53 @@ use super::{Expr, Item, Name, Parse, ParseStream, Result};
 
 parse!({
     enum Stmt {
+        Label(LabelStmt),
         Expr(ExprStmt),
         Assign(AssignStmt),
         Return(ReturnStmt),
         If(IfStmt),
         Block(BlockStmt),
+        Goto(GotoStmt),
     }
 });
 
 impl Parse for Stmt {
     fn parse(input: ParseStream) -> Result<Self> {
-        {}
         Ok(if let Some(stmt) = input.try_parse()? {
+            Self::Label(stmt)
+        } else if let Some(stmt) = input.try_parse()? {
             Self::Return(stmt)
         } else if let Some(stmt) = input.try_parse()? {
             Self::If(stmt)
+        } else if let Some(stmt) = input.try_parse()? {
+            Self::Goto(stmt)
         } else if let Some(stmt) = input.try_parse()? {
             Self::Block(stmt)
         } else if let Some(stmt) = input.try_parse()? {
             Self::Assign(stmt)
         } else {
             Self::Expr(input.parse()?)
+        })
+    }
+}
+
+parse!({
+    struct LabelStmt {
+        open: Token![<<],
+        label: Ident,
+        close: Token![>>],
+    }
+});
+
+impl Parse for LabelStmt {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let open = input.parse()?;
+        input.unrecoverable(|input| {
+            Ok(Self {
+                open,
+                label: input.parse()?,
+                close: input.parse()?,
+            })
         })
     }
 }
@@ -238,5 +264,26 @@ impl Parse for BlockStmt {
         } else {
             parse(input)
         }
+    }
+}
+
+parse!({
+    struct GotoStmt {
+        goto: Token![goto],
+        label: Ident,
+        semi: Token![;],
+    }
+});
+
+impl Parse for GotoStmt {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let goto = input.parse()?;
+        input.unrecoverable(|input| {
+            Ok(Self {
+                goto,
+                label: input.parse()?,
+                semi: input.parse()?,
+            })
+        })
     }
 }

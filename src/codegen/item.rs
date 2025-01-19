@@ -35,28 +35,29 @@ impl Function {
 impl CodeGenStmt for Function {
     fn generate(&self, ctx: &mut Context) -> Result<CCode> {
         let name = self.c_name();
-        let args = self.args().map(|arg| {
-            let name = &arg.name;
-            let ty = &arg.ty;
-            c_code! { #ty #name }
-        });
-
         let mut sub_ctx = ctx.subscope(
             self.return_type()
-                .map(|arg| Type::from_ident(arg, ctx))
+                .map(|ty| Type::from_ident(ty, ctx))
                 .transpose()?,
         );
-        for arg in self.args() {
-            let name = &arg.name;
-            let ty = Type::from_ident(&arg.ty, &sub_ctx)?;
-            sub_ctx.insert(
-                &arg.name,
-                Value::Variable(VariableValue {
-                    name: c_code! { #name },
-                    ty,
-                }),
-            )?;
-        }
+
+        let args = self
+            .args()
+            .map(|arg| {
+                let ty = Type::from_ident(&arg.ty, &sub_ctx)?;
+                let ident = IdentBuilder::variable(&arg.name);
+                let code = c_code! { #ty #ident };
+                sub_ctx.insert(
+                    &arg.name,
+                    Value::Variable(VariableValue {
+                        name: c_code! { #ident },
+                        ty,
+                    }),
+                )?;
+                Ok(code)
+            })
+            .collect::<Result<Vec<_>>>()?;
+
         let items = self
             .items
             .iter()
@@ -70,6 +71,7 @@ impl CodeGenStmt for Function {
             .collect::<Result<Vec<_>>>()?;
 
         let return_type = if let Some(ty) = self.return_type() {
+            let ty = Type::from_ident(ty, ctx)?;
             c_code! { #ty }
         } else {
             c_code! { void }
@@ -106,17 +108,18 @@ impl CodeGenStmt for Function {
 
 impl CodeGenStmt for Variable {
     fn generate(&self, ctx: &mut Context) -> Result<CCode> {
-        let name = &self.name;
         let ty = Type::from_ident(&self.ty, ctx)?;
+        let ident = IdentBuilder::variable(&self.name);
+        let code = c_code! {
+            #ty #ident;
+        };
         ctx.insert(
-            name,
+            &self.name,
             Value::Variable(VariableValue {
-                name: c_code! { #name },
-                ty: ty.clone(),
+                name: c_code! { #ident },
+                ty,
             }),
         )?;
-        Ok(c_code! {
-            #ty #name;
-        })
+        Ok(code)
     }
 }

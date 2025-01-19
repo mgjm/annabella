@@ -8,11 +8,6 @@ use crate::{
 use super::{CCode, CodeGenType, Context, FunctionType, FunctionValue, IdentBuilder, Type, Value};
 
 pub fn generate(ctx: &mut Context) -> Result<()> {
-    ctx.push_type(c_code! {
-        typedef char* String;
-        typedef char Character;
-    });
-
     ctx.push_include("<stdlib.h>");
     ctx.push_function(c_code! {
         void throw_Constraint_Error() {
@@ -24,12 +19,18 @@ pub fn generate(ctx: &mut Context) -> Result<()> {
     generate_boolean(ctx)?;
     generate_integer(ctx)?;
 
-    for (ty, fmt) in [(Type::string(), "%s"), (Type::character(), "%c")] {
-        let ident = Ident {
+    for (ty, code, fmt) in [
+        (Type::string(), c_code! {char*}, "%s"),
+        (Type::character(), c_code! {char}, "%c"),
+    ] {
+        let name = Ident {
             name: ty.to_str().into(),
             span: Span::call_site(),
         };
-        ctx.insert(&ident, Value::Type(TypeValue { ty: ty.clone() }))?;
+        ctx.push_type(c_code! {
+            typedef #code #ty;
+        });
+        ctx.insert(&name, Value::Type(TypeValue { ty: ty.clone() }))?;
         generate_print(ty, fmt, ctx)?;
     }
 
@@ -38,7 +39,7 @@ pub fn generate(ctx: &mut Context) -> Result<()> {
 
 fn generate_boolean(ctx: &mut Context) -> Result<()> {
     let ident = Ident {
-        name: "Boolean".into(),
+        name: "boolean".into(),
         span: Span::call_site(),
     };
     EnumTypeDefinition {
@@ -62,7 +63,7 @@ fn generate_boolean(ctx: &mut Context) -> Result<()> {
 
 fn generate_integer(ctx: &mut Context) -> Result<()> {
     let ident = Ident {
-        name: "Integer".into(),
+        name: "integer".into(),
         span: Span::call_site(),
     };
     SignedTypeDefinition {
@@ -254,7 +255,7 @@ pub fn generate_print(ty: Type, fmt: &'static str, ctx: &mut Context) -> Result<
 
 pub fn generate_custom_print(ty: Type, code: CCode, ctx: &mut Context) -> Result<()> {
     let print = Ident {
-        name: "Print".into(),
+        name: "print".into(),
         span: Span::call_site(),
     };
 

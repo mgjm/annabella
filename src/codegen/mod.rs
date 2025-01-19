@@ -33,7 +33,7 @@ pub fn run(items: Vec<Item>) -> Result<String> {
     }
 
     let ident = Ident {
-        name: "Main".into(),
+        name: "main".into(),
         span: Span::call_site(),
     };
     let Some(ExprValue::Distinct(value)) = ctx.get(&ident)?.expr_value().filter(|value| {
@@ -196,6 +196,7 @@ impl From<SingleExprValue> for ExprValue {
 }
 
 #[derive(Debug)]
+#[expect(dead_code)]
 enum CompileTimeValue {
     Character(char),
     Boolean(bool),
@@ -207,6 +208,7 @@ enum CompileTimeValue {
 struct SingleExprValue {
     ty: Type,
     code: CCode,
+    #[expect(dead_code)]
     value: Option<CompileTimeValue>,
 }
 
@@ -240,6 +242,7 @@ trait CodeGenExpr: Spanned {
     }
 
     fn generate_type(&self, ctx: &mut Context) -> Result<Type> {
+        let _ = ctx;
         Err(self.unrecoverable_error(format!("not a type: {}", std::any::type_name::<Self>())))
     }
 }

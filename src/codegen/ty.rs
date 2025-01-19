@@ -3,11 +3,12 @@ use std::{fmt, mem, ptr, rc::Rc};
 use quote::ToTokens;
 
 use crate::{
+    codegen::IdentBuilder,
     tokenizer::{Ident, Span, Spanned},
     Result,
 };
 
-use super::{CCode, Context, TypeValue, Value};
+use super::{CCode, Context, Value};
 
 #[derive(Clone)]
 pub struct Type(Rc<Inner>);
@@ -19,9 +20,12 @@ impl fmt::Debug for Type {
 }
 
 macro_rules! singleton {
-    ($ident:ident) => {{
+    ($ident:ident, $name:literal) => {{
         thread_local! {
-            static TYPE: Type = Type::new(Inner::$ident);
+            static TYPE: Type = Type::new(Inner::$ident(IdentBuilder::type_(&Ident {
+                name: $name.into(),
+                span: Span::call_site(),
+            })));
         }
         TYPE.with(Clone::clone)
     }};
@@ -33,13 +37,13 @@ impl Type {
     }
 
     pub fn void() -> Self {
-        singleton!(Void)
+        singleton!(Void, "void")
     }
 
     pub fn boolean(ctx: &mut Context<'_>) -> Result<Self> {
         thread_local! {
             static BOOLEAN: Ident = Ident {
-                name: "Boolean".into(),
+                name: "boolean".into(),
                 span: Span::call_site(),
             };
         }
@@ -47,15 +51,15 @@ impl Type {
     }
 
     pub fn character() -> Self {
-        singleton!(Character)
+        singleton!(Character, "character")
     }
 
     pub fn integer() -> Self {
-        singleton!(Integer)
+        singleton!(Integer, "integer")
     }
 
     pub fn string() -> Self {
-        singleton!(String)
+        singleton!(String, "string")
     }
 
     pub fn function(ty: FunctionType) -> Self {
@@ -107,7 +111,7 @@ impl Type {
     }
 
     pub fn is_void(&self) -> bool {
-        matches!(self.inner(), Inner::Void)
+        matches!(self.inner(), Inner::Void(_))
     }
 
     pub fn as_function(&self) -> Option<&FunctionType> {
@@ -119,10 +123,10 @@ impl Type {
 
     pub fn to_str(&self) -> &str {
         match self.inner() {
-            Inner::Void => "Void",
-            Inner::Character => "Character",
-            Inner::Integer => "Integer",
-            Inner::String => "String",
+            Inner::Void(_) => "void",
+            Inner::Character(_) => "character",
+            Inner::Integer(_) => "integer",
+            Inner::String(_) => "string",
             Inner::Function(ty) => ty.to_str(),
             Inner::Enum(ty) => ty.to_str(),
             Inner::Signed(ty) => ty.to_str(),
@@ -133,10 +137,10 @@ impl Type {
     /// Is it allowed to assign a `source` value to `self`?
     pub fn can_assign(&self, source: &Self) -> bool {
         match self.inner() {
-            Inner::Void => matches!(source.inner(), Inner::Void),
-            Inner::Character => matches!(source.inner(), Inner::Character),
-            Inner::Integer => matches!(source.inner(), Inner::Integer),
-            Inner::String => matches!(source.inner(), Inner::String),
+            Inner::Void(_) => matches!(source.inner(), Inner::Void(_)),
+            Inner::Character(_) => matches!(source.inner(), Inner::Character(_)),
+            Inner::Integer(_) => matches!(source.inner(), Inner::Integer(_)),
+            Inner::String(_) => matches!(source.inner(), Inner::String(_)),
             Inner::Function(ty) => ty.can_assign(source),
             Inner::Enum(ty) => ty.can_assign(source),
             Inner::Signed(ty) => ty.can_assign(source),
@@ -147,10 +151,10 @@ impl Type {
     /// Is a constraint check required when assigning a `source` value to `self`?
     pub fn needs_constraint_check(&self, source: &Self) -> Option<&CCode> {
         match self.inner() {
-            Inner::Void => None,
-            Inner::Character => None,
-            Inner::Integer => None,
-            Inner::String => None,
+            Inner::Void(_) => None,
+            Inner::Character(_) => None,
+            Inner::Integer(_) => None,
+            Inner::String(_) => None,
             Inner::Function(ty) => ty.needs_constraint_check(source),
             Inner::Enum(ty) => ty.needs_constraint_check(source),
             Inner::Signed(ty) => ty.needs_constraint_check(source),
@@ -161,13 +165,12 @@ impl Type {
 
 impl ToTokens for Type {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let new_ident = || proc_macro2::Ident::new(self.to_str(), proc_macro2::Span::call_site());
         match self.inner() {
-            Inner::Void => new_ident().to_tokens(tokens),
-            Inner::Character => new_ident().to_tokens(tokens),
-            Inner::Integer => new_ident().to_tokens(tokens),
-            Inner::String => new_ident().to_tokens(tokens),
-            Inner::Function(_) => new_ident().to_tokens(tokens),
+            Inner::Void(_) => unimplemented!("void type to tokens"),
+            Inner::Character(ident) => ident.to_tokens(tokens),
+            Inner::Integer(ident) => ident.to_tokens(tokens),
+            Inner::String(ident) => ident.to_tokens(tokens),
+            Inner::Function(_) => todo!("function type to tokens"),
             Inner::Enum(ty) => ty.ident.to_tokens(tokens),
             Inner::Signed(ty) => ty.ident.to_tokens(tokens),
             Inner::Subtype(ty) => ty.last_parent().to_tokens(tokens),
@@ -188,10 +191,10 @@ impl<'a> Iterator for Parents<'a> {
 
 #[derive(Debug)]
 pub enum Inner {
-    Void,
-    Character,
-    Integer,
-    String,
+    Void(proc_macro2::Ident),
+    Character(proc_macro2::Ident),
+    Integer(proc_macro2::Ident),
+    String(proc_macro2::Ident),
     Function(FunctionType),
     Enum(EnumType),
     Signed(SignedType),
@@ -281,7 +284,7 @@ impl TypeImpl for SignedType {
     fn can_assign(&self, mut source: &Type) -> bool {
         let source = loop {
             source = match source.inner() {
-                Inner::Integer => return true,
+                Inner::Integer(_) => return true,
                 Inner::Subtype(ty) => &ty.parent,
                 Inner::Signed(ty) => break ty,
                 _ => return false,

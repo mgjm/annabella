@@ -102,7 +102,8 @@ impl Parse for Ident {
         input.step(|cursor| {
             if let Some((ident, rest)) = cursor.ident() {
                 if is_keyword(ident) {
-                    Err(ident.recoverable_error("expected identifier, found keyword `{ident}`"))
+                    Err(ident
+                        .recoverable_error(format!("expected identifier, found keyword `{ident}`")))
                 } else {
                     Ok((ident.clone(), rest))
                 }

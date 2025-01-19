@@ -164,5 +164,15 @@ Swap:
       U := Temp;
    end;
 
+   i := 5;
+<<label>>
+   Print(i);
+   i := i - 1;
+   if i <= 0 then
+      goto end_label;
+   end if;
+   goto label;
+<<end_label>>
+
    Print("End");
 end;

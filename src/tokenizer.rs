@@ -338,7 +338,7 @@ impl Ident {
         };
 
         let start = input.offset;
-        let name = input[..index].into();
+        let name = input[..index].to_lowercase().into();
         let input = input.advance(index);
         let span = Span::new(start, input.offset - 1);
         Ok(Some((Self { name, span }, input)))

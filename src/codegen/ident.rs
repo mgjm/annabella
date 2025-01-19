@@ -91,7 +91,15 @@ impl IdentBuilder {
     }
 
     pub fn type_(name: &Ident) -> CIdent {
-        CIdent::new(&name.name, Span::call_site())
-        // Self::start("type").ident(name).build()
+        // CIdent::new(&name.name, Span::call_site())
+        Self::start("type").ident(name).build()
+    }
+
+    pub fn label(label: &Ident) -> CIdent {
+        Self::start("label").ident(label).build()
+    }
+
+    pub(crate) fn variable(name: &Ident) -> CIdent {
+        Self::start("variable").ident(name).build()
     }
 }

@@ -538,7 +538,7 @@ keyword_token!("xor", Xor);
 fn parse_keyword(input: ParseStream, token: &str) -> Result<Span> {
     input.step(|cursor| {
         if let Some((ident, rest)) = cursor.ident() {
-            if ident.name.eq_ignore_ascii_case(token) {
+            if &*ident.name == token {
                 return Ok((ident.span(), rest));
             }
         }

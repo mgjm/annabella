@@ -31,6 +31,10 @@ impl Scope<'_> {
         }
     }
 
+    pub fn get_or_insert(&mut self, ident: &Ident, value: impl FnOnce() -> Value) -> &Value {
+        self.values.entry(ident.name.clone()).or_insert_with(value)
+    }
+
     pub fn get(&self, ident: &Ident) -> Result<&Value> {
         let mut this = Some(self);
         while let Some(scope) = this {
@@ -48,6 +52,7 @@ pub enum Value {
     Function(FunctionValue),
     Type(TypeValue),
     Variable(VariableValue),
+    Label(LabelValue),
 }
 
 impl Value {
@@ -61,8 +66,9 @@ impl Value {
     pub(super) fn expr_value(&self) -> ExprValue {
         match self {
             Self::Function(value) => value.expr_value(),
-            Self::Type(_value) => unreachable!(),
+            Self::Type(_) => unreachable!(),
             Self::Variable(value) => value.expr_value(),
+            Self::Label(_) => unreachable!(),
         }
     }
 }
@@ -121,4 +127,9 @@ impl VariableValue {
         }
         .into()
     }
+}
+
+#[derive(Debug)]
+pub struct LabelValue {
+    pub name: CCode,
 }

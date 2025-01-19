@@ -1,10 +1,9 @@
 use crate::{
     parser::{
-        Constraint, EnumTypeDefinition, Expr, ExprLit, FullTypeItem, LitNumber,
-        ModularTypeDefinition, Range, RangeConstraint, SignedTypeDefinition, SubtypeItem,
-        TypeDefinition, TypeItem,
+        Constraint, EnumTypeDefinition, Expr, FullTypeItem, ModularTypeDefinition, Range,
+        RangeConstraint, SignedTypeDefinition, SubtypeItem, TypeDefinition, TypeItem,
     },
-    tokenizer::{Ident, Span},
+    tokenizer::Ident,
     Result,
 };
 
@@ -40,6 +39,7 @@ impl CodeGenType for TypeDefinition {
 impl CodeGenType for EnumTypeDefinition {
     fn generate(&self, name: &Ident, ctx: &mut Context) -> Result<CCode> {
         let ident = IdentBuilder::type_(name);
+
         ctx.push_type(c_code! {
             typedef int #ident;
         });
