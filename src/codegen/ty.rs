@@ -3,7 +3,7 @@ use std::{fmt, mem, ptr, rc::Rc};
 use quote::ToTokens;
 
 use crate::{
-    tokenizer::{Ident, Spanned},
+    tokenizer::{Ident, Span, Spanned},
     Result,
 };
 
@@ -36,8 +36,14 @@ impl Type {
         singleton!(Void)
     }
 
-    pub fn boolean() -> Self {
-        singleton!(Boolean)
+    pub fn boolean(ctx: &mut Context<'_>) -> Result<Self> {
+        thread_local! {
+            static BOOLEAN: Ident = Ident {
+                name: "Boolean".into(),
+                span: Span::call_site(),
+            };
+        }
+        BOOLEAN.with(|ident| Self::from_ident(ident, ctx))
     }
 
     pub fn character() -> Self {
@@ -114,7 +120,6 @@ impl Type {
     pub fn to_str(&self) -> &str {
         match self.inner() {
             Inner::Void => "Void",
-            Inner::Boolean => "Boolean",
             Inner::Character => "Character",
             Inner::Integer => "Integer",
             Inner::String => "String",
@@ -129,7 +134,6 @@ impl Type {
     pub fn can_assign(&self, source: &Self) -> bool {
         match self.inner() {
             Inner::Void => matches!(source.inner(), Inner::Void),
-            Inner::Boolean => matches!(source.inner(), Inner::Boolean),
             Inner::Character => matches!(source.inner(), Inner::Character),
             Inner::Integer => matches!(source.inner(), Inner::Integer),
             Inner::String => matches!(source.inner(), Inner::String),
@@ -144,7 +148,6 @@ impl Type {
     pub fn needs_constraint_check(&self, source: &Self) -> Option<&CCode> {
         match self.inner() {
             Inner::Void => None,
-            Inner::Boolean => None,
             Inner::Character => None,
             Inner::Integer => None,
             Inner::String => None,
@@ -161,7 +164,6 @@ impl ToTokens for Type {
         let new_ident = || proc_macro2::Ident::new(self.to_str(), proc_macro2::Span::call_site());
         match self.inner() {
             Inner::Void => new_ident().to_tokens(tokens),
-            Inner::Boolean => new_ident().to_tokens(tokens),
             Inner::Character => new_ident().to_tokens(tokens),
             Inner::Integer => new_ident().to_tokens(tokens),
             Inner::String => new_ident().to_tokens(tokens),
@@ -187,7 +189,6 @@ impl<'a> Iterator for Parents<'a> {
 #[derive(Debug)]
 pub enum Inner {
     Void,
-    Boolean,
     Character,
     Integer,
     String,

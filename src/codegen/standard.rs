@@ -1,6 +1,6 @@
 use crate::{
     codegen::TypeValue,
-    parser::{Expr, ExprLit, LitNumber, Range, SignedTypeDefinition},
+    parser::{EnumTypeDefinition, Expr, Range, SignedTypeDefinition},
     tokenizer::{Ident, Span},
     Result, Token,
 };
@@ -21,6 +21,7 @@ pub fn generate(ctx: &mut Context) -> Result<()> {
         }
     });
 
+    generate_boolean(ctx)?;
     generate_integer(ctx)?;
 
     for (ty, fmt) in [(Type::string(), "%s"), (Type::character(), "%c")] {
@@ -33,6 +34,30 @@ pub fn generate(ctx: &mut Context) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn generate_boolean(ctx: &mut Context) -> Result<()> {
+    let ident = Ident {
+        name: "Boolean".into(),
+        span: Span::call_site(),
+    };
+    EnumTypeDefinition {
+        values: [
+            Ident {
+                name: "false".into(),
+                span: Span::call_site(),
+            },
+            Ident {
+                name: "true".into(),
+                span: Span::call_site(),
+            },
+        ]
+        .into_iter()
+        .collect(),
+    }
+    .generate(&ident, ctx)?;
+
+    generate_boolean_logical_ops(&Type::boolean(ctx)?, ctx)
 }
 
 fn generate_integer(ctx: &mut Context) -> Result<()> {
@@ -89,18 +114,12 @@ pub(crate) fn generate_signed_ops(ty: &Type, ctx: &mut Context) -> Result<()> {
         - -
         * *
         / /
-        = ==
-        /= !=
-        < <
-        <= <=
-        > >
-        >= >=
         and &
         or |
         xor ^
     }
 
-    Ok(())
+    generate_comparison_ops(ty, ctx)
 }
 
 pub(crate) fn generate_modular_ops(ty: &Type, modulus: &CCode, ctx: &mut Context) -> Result<()> {
@@ -139,15 +158,85 @@ pub(crate) fn generate_modular_ops(ty: &Type, modulus: &CCode, ctx: &mut Context
         - - { + #modulus}
         * * {}
         / / {}
-        = == {}
-        /= != {}
-        < < {}
-        <= <= {}
-        > > {}
-        >= >= {}
         and & {}
         or | {}
         xor ^ {}
+    }
+
+    generate_comparison_ops(ty, ctx)
+}
+
+pub(crate) fn generate_boolean_logical_ops(ty: &Type, ctx: &mut Context) -> Result<()> {
+    macro_rules! boolean_ops {
+        ($($ada:tt $c:tt)*) => {
+            $(
+                let op: Token![$ada] = Default::default();
+                let ident = IdentBuilder::op_function(op, ty);
+                ctx.push_function(c_code! {
+                    #ty #ident(#ty lhs, #ty rhs) {
+                        return lhs $c rhs;
+                    }
+                });
+
+                ctx.insert(
+                    &op.operator_symbol(),
+                    Value::Function(FunctionValue::new(
+                         c_code! { #ident },
+                         Type::function(FunctionType {
+                            args: vec![ty.clone(), ty.clone()],
+                            return_type: ty.clone(),
+                        })
+                    )),
+                )?;
+
+            )*
+        };
+    }
+
+    boolean_ops! {
+        and &&
+        or ||
+        xor ^
+    }
+
+    Ok(())
+}
+
+pub(crate) fn generate_comparison_ops(ty: &Type, ctx: &mut Context) -> Result<()> {
+    let boolean = Type::boolean(ctx)?;
+    macro_rules! integer_ops {
+        ($($ada:tt $c:tt)*) => {
+            $(
+                let op: Token![$ada] = Default::default();
+                let ident = IdentBuilder::op_function(op, ty);
+                ctx.push_function(c_code! {
+                    #boolean #ident(#ty lhs, #ty rhs) {
+                        return lhs $c rhs;
+                    }
+                });
+
+                ctx.insert(
+                    &op.operator_symbol(),
+                    Value::Function(FunctionValue::new(
+                         c_code! { #ident },
+                         Type::function(FunctionType {
+                            args: vec![ty.clone(), ty.clone()],
+                            return_type: boolean.clone(),
+                        })
+                    )),
+                )?;
+
+            )*
+        };
+    }
+
+    integer_ops! {
+        = ==
+        /= !=
+        < <
+        <= <=
+        > >
+        >= >=
     }
 
     Ok(())

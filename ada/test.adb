@@ -84,6 +84,7 @@ procedure Main is
    m: Meter;
    i: Inch;
    min: Minute;
+   b: Boolean;
 begin
    Print("Start");
    Print("Hello \n World""");
@@ -120,6 +121,18 @@ begin
 
    min := 5;
    Print(min + 5 / 3 * 59);
-   
+
+   b := false;
+   Print(b);
+
+   b := true;
+   Print(b);
+
+   b := i < 5;
+   Print(b);
+
+   b := b < false;
+   Print(b);
+
    Print("End");
 end;

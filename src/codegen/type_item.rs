@@ -71,6 +71,8 @@ impl CodeGenType for EnumTypeDefinition {
 
         ctx.insert(name, Value::Type(TypeValue { ty: ty.clone() }))?;
 
+        standard::generate_comparison_ops(&ty, ctx)?;
+
         let values_str = self.values.iter().map(|v| &*v.name);
         standard::generate_custom_print(
             ty,
