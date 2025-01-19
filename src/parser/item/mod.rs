@@ -71,11 +71,7 @@ impl Parse for Function {
             let is_ = input.parse()?;
             let (items, begin) = input.parse_until(Token![begin])?;
             let (stmts, end) = input.parse_until_end()?;
-            if let Some(name2) = input.try_parse::<Ident>()? {
-                if name != name2 {
-                    return Err(name2.unrecoverable_error(format!("expected `{name}`")));
-                }
-            }
+            input.try_parse_ident(&name)?;
             let semi = input.parse()?;
             Ok(Self {
                 kind,

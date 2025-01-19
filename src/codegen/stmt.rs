@@ -1,5 +1,5 @@
 use crate::{
-    parser::{AssignStmt, ExprStmt, IfStmt, ReturnStmt, Stmt},
+    parser::{AssignStmt, BlockStmt, ExprStmt, IfStmt, ReturnStmt, Stmt},
     tokenizer::Spanned,
     Result,
 };
@@ -13,6 +13,7 @@ impl CodeGenStmt for Stmt {
             Self::Assign(stmt) => stmt.generate(ctx),
             Self::Return(stmt) => stmt.generate(ctx),
             Self::If(stmt) => stmt.generate(ctx),
+            Self::Block(stmt) => stmt.generate(ctx),
         }
     }
 }
@@ -109,6 +110,30 @@ impl CodeGenStmt for IfStmt {
             }
             #(#else_ifs)*
             #else_
+        })
+    }
+}
+
+impl CodeGenStmt for BlockStmt {
+    fn generate(&self, ctx: &mut Context) -> Result<CCode> {
+        let mut sub_ctx = ctx.subscope(ctx.return_type());
+
+        let items = self
+            .items()
+            .map(|item| item.generate(&mut sub_ctx))
+            .collect::<Result<Vec<_>>>()?;
+
+        let stmts = self
+            .stmts
+            .iter()
+            .map(|stmt| stmt.generate(&mut sub_ctx))
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(c_code! {
+            {
+                #(#items)*
+                #(#stmts)*
+            }
         })
     }
 }

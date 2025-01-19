@@ -173,6 +173,23 @@ impl ParseBuffer<'_> {
         self.call(T::parse)
     }
 
+    pub fn parse_ident(&mut self, expected: &Ident) -> Result<()> {
+        let ident: Ident = self.parse()?;
+        if *expected == ident {
+            Ok(())
+        } else {
+            Err(ident.unrecoverable_error(format!("expected `{expected}`")))
+        }
+    }
+
+    pub fn try_parse_ident(&mut self, expected: &Ident) -> Result<bool> {
+        match self.try_parse::<Ident>()? {
+            None => Ok(false),
+            Some(ident) if ident == *expected => Ok(true),
+            Some(ident) => Err(ident.unrecoverable_error(format!("expected `{expected}`"))),
+        }
+    }
+
     fn call<T>(&mut self, parse: impl FnOnce(ParseStream) -> Result<T>) -> Result<T> {
         let mut clone = Self { inner: self.inner };
         let value = parse(&mut clone)?;
@@ -207,18 +224,26 @@ impl ParseBuffer<'_> {
         result
     }
 
-    fn parse_until<T, F>(&mut self, token: F) -> Result<(Vec<T>, F::Token)>
+    fn parse_until_peeked<T, F>(&mut self, token: F) -> Result<Vec<T>>
     where
         T: Parse,
         F: TokenFn,
     {
-        let value = self.call(|input| {
+        self.call(|input| {
             let mut vec = Vec::new();
             while !input.peek(token) {
                 vec.push(input.parse()?);
             }
             Ok(vec)
-        })?;
+        })
+    }
+
+    fn parse_until<T, F>(&mut self, token: F) -> Result<(Vec<T>, F::Token)>
+    where
+        T: Parse,
+        F: TokenFn,
+    {
+        let value = self.parse_until_peeked(token)?;
         Ok((value, self.parse()?))
     }
 

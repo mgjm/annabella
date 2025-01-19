@@ -85,6 +85,8 @@ procedure Main is
    i: Inch;
    min: Minute;
    b: Boolean;
+   U: Integer;
+   V: Integer;
 begin
    Print("Start");
    Print("Hello \n World""");
@@ -144,6 +146,23 @@ begin
    else
       Print("else");
    end if;
+
+Swap:
+   declare
+      Temp : Integer;
+   begin
+      Temp := V;
+      V := U;
+      U := Temp;
+   end Swap;
+
+   declare
+      Temp : Integer;
+   begin
+      Temp := V;
+      V := U;
+      U := Temp;
+   end;
 
    Print("End");
 end;

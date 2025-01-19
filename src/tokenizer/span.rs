@@ -75,6 +75,16 @@ impl<T: Spanned> Spanned for [T] {
     }
 }
 
+impl<T: Spanned> Spanned for Vec<T> {
+    fn span(&self) -> Span {
+        self.as_slice().span()
+    }
+
+    fn first_span(&self) -> Span {
+        self.as_slice().first_span()
+    }
+}
+
 impl<A: Spanned, B: Spanned> Spanned for (A, B) {
     fn span(&self) -> Span {
         let mut span = self.0.span();

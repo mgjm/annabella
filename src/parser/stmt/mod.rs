@@ -1,9 +1,9 @@
 use crate::{
-    tokenizer::{Span, Spanned},
+    tokenizer::{Ident, Span, Spanned},
     Token,
 };
 
-use super::{Expr, Name, Parse, ParseStream, Result};
+use super::{Expr, Item, Name, Parse, ParseStream, Result};
 
 parse!({
     enum Stmt {
@@ -11,15 +11,19 @@ parse!({
         Assign(AssignStmt),
         Return(ReturnStmt),
         If(IfStmt),
+        Block(BlockStmt),
     }
 });
 
 impl Parse for Stmt {
     fn parse(input: ParseStream) -> Result<Self> {
+        {}
         Ok(if let Some(stmt) = input.try_parse()? {
             Self::Return(stmt)
         } else if let Some(stmt) = input.try_parse()? {
             Self::If(stmt)
+        } else if let Some(stmt) = input.try_parse()? {
+            Self::Block(stmt)
         } else if let Some(stmt) = input.try_parse()? {
             Self::Assign(stmt)
         } else {
@@ -174,3 +178,65 @@ parse!({
         stmts: Vec<Stmt>,
     }
 });
+
+parse!({
+    struct BlockStmt {
+        ident: Option<(Ident, Token![:])>,
+        declare: Option<(Token![declare], Vec<Item>)>,
+        begin: Token![begin],
+        stmts: Vec<Stmt>,
+        end: Token![end],
+        semi: Token![;],
+    }
+});
+
+impl BlockStmt {
+    pub fn ident(&self) -> Option<&Ident> {
+        self.ident.as_ref().map(|(ident, _)| ident)
+    }
+
+    pub fn items(&self) -> impl Iterator<Item = &Item> + '_ {
+        self.declare
+            .as_ref()
+            .map_or(Default::default(), |(_, items)| items.as_slice())
+            .iter()
+    }
+}
+
+impl Parse for BlockStmt {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let ident = input.try_call(|input| {
+            let ident = input.parse()?;
+            let colon = input.parse()?;
+            Ok((ident, colon))
+        })?;
+        let declare = input.try_call(|input| {
+            let declare = input.parse()?;
+            input.unrecoverable(|input| Ok((declare, input.parse_until_peeked(Token![begin])?)))
+        })?;
+        let declare_found = declare.is_some();
+        let parse = |input: ParseStream| {
+            let begin = input.parse()?;
+            input.unrecoverable(|input| {
+                let (stmts, end) = input.parse_until_end()?;
+                if let Some((ident, _)) = &ident {
+                    input.parse_ident(ident)?;
+                }
+                let semi = input.parse()?;
+                Ok(Self {
+                    ident,
+                    declare,
+                    begin,
+                    stmts,
+                    end,
+                    semi,
+                })
+            })
+        };
+        if declare_found {
+            input.unrecoverable(parse)
+        } else {
+            parse(input)
+        }
+    }
+}
