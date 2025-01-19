@@ -1,6 +1,9 @@
 use crate::{
     codegen::IdentBuilder,
-    parser::{AssignStmt, BlockStmt, ExprStmt, GotoStmt, IfStmt, LabelStmt, ReturnStmt, Stmt},
+    parser::{
+        AssignStmt, BlockStmt, ExitStmt, ExprStmt, GotoStmt, IfStmt, LabelStmt, LoopScheme,
+        LoopStmt, ReturnStmt, Stmt,
+    },
     tokenizer::Spanned,
     Result,
 };
@@ -19,6 +22,8 @@ impl CodeGenStmt for Stmt {
             Self::If(stmt) => stmt.generate(ctx),
             Self::Block(stmt) => stmt.generate(ctx),
             Self::Goto(stmt) => stmt.generate(ctx),
+            Self::Loop(stmt) => stmt.generate(ctx),
+            Self::Exit(stmt) => stmt.generate(ctx),
         }
     }
 }
@@ -173,6 +178,111 @@ impl CodeGenStmt for GotoStmt {
         };
         Ok(c_code! {
             goto #name;
+        })
+    }
+}
+
+impl CodeGenStmt for LoopStmt {
+    fn generate(&self, ctx: &mut Context) -> Result<CCode> {
+        let mut sub_ctx = ctx.subscope(ctx.return_type());
+
+        let stmts = self
+            .stmts
+            .iter()
+            .map(|stmt| stmt.generate(&mut sub_ctx))
+            .collect::<Result<Vec<_>>>()?;
+
+        let stmts = c_code! {
+            {
+                #(#stmts)*
+            }
+        };
+
+        let code = match &self.scheme {
+            LoopScheme::Endless(_) => c_code! { while (1) #stmts },
+            LoopScheme::While(scheme) => {
+                let cond = scheme.cond.generate_to_boolean(ctx)?;
+                c_code! { while (#cond) #stmts }
+            }
+            LoopScheme::For(scheme) => {
+                let code = scheme.range.start.generate(ctx)?.flat_map(|start| {
+                    let ty = &start.ty;
+
+                    let end = scheme.range.end.generate_with_type_and_check(ty, ctx)?;
+                    let ident = IdentBuilder::variable(&scheme.ident);
+
+                    if scheme.reverse() {
+                        Ok(SingleExprValue {
+                            ty: Type::void(),
+                            code: c_code! {
+                                {
+                                    #ty #ident = #end;
+                                    if (#start <= #end) {
+                                        while (1) {
+                                            #stmts
+                                            if (#ident <= #start) {
+                                                break;
+                                            }
+                                            #ident -= 1;
+                                        }
+                                    }
+                                }
+                            },
+                            value: None,
+                        }
+                        .into())
+                    } else {
+                        Ok(SingleExprValue {
+                            ty: Type::void(),
+                            code: c_code! {
+                                {
+                                    #ty #ident = #start;
+                                    if (#start <= #end) {
+                                        while(1) {
+                                            #stmts
+                                            if (#ident >= #end) {
+                                                break;
+                                            }
+                                            #ident += 1;
+                                        }
+                                    }
+                                }
+                            },
+                            value: None,
+                        }
+                        .into())
+                    }
+                })?;
+                let ExprValue::Distinct(code) = code else {
+                    return Err(scheme
+                        .range
+                        .unrecoverable_error("ambiguous range expression"));
+                };
+                code.code
+            }
+        };
+
+        Ok(code)
+    }
+}
+
+impl CodeGenStmt for ExitStmt {
+    fn generate(&self, ctx: &mut Context) -> Result<CCode> {
+        if let Some(name) = &self.name {
+            return Err(name.unrecoverable_error("exit to named loop not yet implemented"));
+        }
+
+        Ok(if let Some(cond) = self.cond() {
+            let cond = cond.generate_to_boolean(ctx)?;
+            c_code! {
+                if (#cond) {
+                    break;
+                }
+            }
+        } else {
+            c_code! {
+                break;
+            }
         })
     }
 }

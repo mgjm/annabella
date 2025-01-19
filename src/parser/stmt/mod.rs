@@ -1,9 +1,9 @@
 use crate::{
     tokenizer::{Ident, Span, Spanned},
-    Token,
+    Result, Token,
 };
 
-use super::{Expr, Item, Name, Parse, ParseStream, Result};
+use super::{Expr, Item, Name, Parse, ParseStream, Range};
 
 parse!({
     enum Stmt {
@@ -14,6 +14,8 @@ parse!({
         If(IfStmt),
         Block(BlockStmt),
         Goto(GotoStmt),
+        Loop(LoopStmt),
+        Exit(ExitStmt),
     }
 });
 
@@ -27,6 +29,10 @@ impl Parse for Stmt {
             Self::If(stmt)
         } else if let Some(stmt) = input.try_parse()? {
             Self::Goto(stmt)
+        } else if let Some(stmt) = input.try_parse()? {
+            Self::Exit(stmt)
+        } else if let Some(stmt) = input.try_parse()? {
+            Self::Loop(stmt)
         } else if let Some(stmt) = input.try_parse()? {
             Self::Block(stmt)
         } else if let Some(stmt) = input.try_parse()? {
@@ -231,11 +237,7 @@ impl BlockStmt {
 
 impl Parse for BlockStmt {
     fn parse(input: ParseStream) -> Result<Self> {
-        let ident = input.try_call(|input| {
-            let ident = input.parse()?;
-            let colon = input.parse()?;
-            Ok((ident, colon))
-        })?;
+        let ident = input.try_call(parse_ident_colon)?;
         let declare = input.try_call(|input| {
             let declare = input.parse()?;
             input.unrecoverable(|input| Ok((declare, input.parse_until_peeked(Token![begin])?)))
@@ -286,4 +288,162 @@ impl Parse for GotoStmt {
             })
         })
     }
+}
+
+parse!({
+    struct LoopStmt {
+        ident: Option<(Ident, Token![:])>,
+        scheme: LoopScheme,
+        loop_: Token![loop],
+        stmts: Vec<Stmt>,
+        end: Token![end],
+        semi: Token![;],
+    }
+});
+
+impl LoopStmt {
+    pub fn ident(&self) -> Option<&Ident> {
+        self.ident.as_ref().map(|(ident, _)| ident)
+    }
+}
+
+impl Parse for LoopStmt {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let ident = input.try_call(parse_ident_colon)?;
+        let scheme = input.parse()?;
+        let loop_ = input.parse()?;
+        input.unrecoverable(|input| {
+            let (stmts, end) = input.parse_until_end()?;
+            let _: Token![loop] = input.parse()?;
+            if let Some((ident, _)) = &ident {
+                input.parse_ident(ident)?;
+            }
+            let semi = input.parse()?;
+            Ok(Self {
+                ident,
+                scheme,
+                loop_,
+                stmts,
+                end,
+                semi,
+            })
+        })
+    }
+}
+
+parse!({
+    enum LoopScheme {
+        Endless(EndlessLoopScheme),
+        While(WhileLoopScheme),
+        For(ForLoopScheme),
+    }
+});
+
+impl Parse for LoopScheme {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(if let Some(scheme) = input.try_parse()? {
+            Self::While(scheme)
+        } else if let Some(scheme) = input.try_parse()? {
+            Self::For(scheme)
+        } else {
+            Self::Endless(EndlessLoopScheme)
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EndlessLoopScheme;
+
+impl Spanned for EndlessLoopScheme {
+    fn span(&self) -> Span {
+        Span::call_site()
+    }
+}
+
+parse!({
+    struct WhileLoopScheme {
+        while_: Token![while],
+        cond: Expr,
+    }
+});
+
+impl Parse for WhileLoopScheme {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let while_ = input.parse()?;
+        input.unrecoverable(|input| {
+            Ok(Self {
+                while_,
+                cond: input.parse()?,
+            })
+        })
+    }
+}
+
+parse!({
+    struct ForLoopScheme {
+        for_: Token![for],
+        ident: Ident,
+        in_: Token![in],
+        reverse: Option<Token![reverse]>,
+        range: Range,
+    }
+});
+
+impl ForLoopScheme {
+    pub fn reverse(&self) -> bool {
+        self.reverse.is_some()
+    }
+}
+
+impl Parse for ForLoopScheme {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let for_ = input.parse()?;
+        input.unrecoverable(|input| {
+            Ok(Self {
+                for_,
+                ident: input.parse()?,
+                in_: input.parse()?,
+                reverse: input.try_parse()?,
+                range: input.parse()?,
+            })
+        })
+    }
+}
+
+parse!({
+    struct ExitStmt {
+        exit: Token![exit],
+        name: Option<Ident>,
+        when: Option<(Token![when], Expr)>,
+        semi: Token![;],
+    }
+});
+
+impl ExitStmt {
+    pub fn cond(&self) -> Option<&Expr> {
+        self.when.as_ref().map(|(_, cond)| cond)
+    }
+}
+
+impl Parse for ExitStmt {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let exit = input.parse()?;
+        input.unrecoverable(|input| {
+            Ok(Self {
+                exit,
+                name: input.try_parse()?,
+                when: input.try_call(|input| {
+                    let when = input.parse()?;
+                    input.unrecoverable(|input| Ok((when, input.parse()?)))
+                })?,
+                semi: input.parse()?,
+            })
+        })
+    }
+}
+
+fn parse_ident_colon(input: ParseStream) -> Result<(Ident, Token![:])> {
+    let ident = input.parse()?;
+    let colon = input.parse()?;
+    Ok((ident, colon))
 }

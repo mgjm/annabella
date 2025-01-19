@@ -174,5 +174,26 @@ Swap:
    goto label;
 <<end_label>>
 
+   i := 5;
+   loop
+      Print(i);
+      i := i - 1;
+      exit when i <= 0;
+   end loop;
+
+   i := 5;
+   while i > 0 loop
+      Print(i);
+      i := i - 1;
+   end loop;
+
+   for i in 0 .. 5 loop
+      Print(i);
+   end loop;
+
+   for i in reverse 0 .. 5 loop
+      Print(i);
+   end loop;
+
    Print("End");
 end;

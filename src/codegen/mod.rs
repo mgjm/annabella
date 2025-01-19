@@ -241,6 +241,10 @@ trait CodeGenExpr: Spanned {
         }
     }
 
+    fn generate_to_boolean(&self, ctx: &mut Context) -> Result<CCode> {
+        self.generate_with_type_and_check(&Type::boolean(ctx)?, ctx)
+    }
+
     fn generate_type(&self, ctx: &mut Context) -> Result<Type> {
         let _ = ctx;
         Err(self.unrecoverable_error(format!("not a type: {}", std::any::type_name::<Self>())))
