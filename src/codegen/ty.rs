@@ -1,4 +1,4 @@
-use std::{fmt, ptr, rc::Rc};
+use std::{fmt, mem, ptr, rc::Rc};
 
 use quote::ToTokens;
 
@@ -84,6 +84,22 @@ impl Type {
         &self.0
     }
 
+    fn last_parent(&self) -> &Self {
+        let mut inner = self;
+        while let Inner::Subtype(p) = inner.inner() {
+            inner = &p.parent;
+        }
+        inner
+    }
+
+    fn last_parent_inner(&self) -> &Inner {
+        self.last_parent().inner()
+    }
+
+    fn parents(&self) -> Parents {
+        Parents(Some(self.inner()))
+    }
+
     pub fn is_void(&self) -> bool {
         matches!(self.inner(), Inner::Void)
     }
@@ -152,8 +168,19 @@ impl ToTokens for Type {
             Inner::Function(_) => new_ident().to_tokens(tokens),
             Inner::Enum(ty) => ty.ident.to_tokens(tokens),
             Inner::Signed(ty) => ty.ident.to_tokens(tokens),
-            Inner::Subtype(ty) => ty.parent().to_tokens(tokens),
+            Inner::Subtype(ty) => ty.last_parent().to_tokens(tokens),
         }
+    }
+}
+
+struct Parents<'a>(Option<&'a Inner>);
+
+impl<'a> Iterator for Parents<'a> {
+    type Item = &'a Inner;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let parent = self.0?.parent();
+        mem::replace(&mut self.0, parent)
     }
 }
 
@@ -168,6 +195,15 @@ pub enum Inner {
     Enum(EnumType),
     Signed(SignedType),
     Subtype(SubtypeType),
+}
+
+impl Inner {
+    fn parent(&self) -> Option<&Inner> {
+        let Self::Subtype(ty) = self else {
+            return None;
+        };
+        Some(ty.parent.inner())
+    }
 }
 
 trait TypeImpl: fmt::Debug {
@@ -255,7 +291,7 @@ impl TypeImpl for SignedType {
     }
 
     fn needs_constraint_check(&self, source: &Type) -> Option<&CCode> {
-        if let Inner::Signed(source) = source.inner() {
+        if let Inner::Signed(source) = source.last_parent_inner() {
             if ptr::eq(self, source) {
                 return None;
             }
@@ -271,28 +307,26 @@ pub struct SubtypeType {
 }
 
 impl SubtypeType {
-    fn parent(&self) -> &Type {
-        let mut parent = &self.parent;
-        while let Inner::Subtype(p) = parent.inner() {
-            parent = &p.parent;
-        }
-        parent
+    fn last_parent(&self) -> &Type {
+        self.parent.last_parent()
     }
 }
 
 impl TypeImpl for SubtypeType {
     fn to_str(&self) -> &str {
-        self.parent().to_str()
+        self.last_parent().to_str()
     }
 
     fn can_assign(&self, source: &Type) -> bool {
-        self.parent().can_assign(source)
+        self.last_parent().can_assign(source)
     }
 
     fn needs_constraint_check(&self, source: &Type) -> Option<&CCode> {
-        if let Inner::Subtype(source) = source.inner() {
-            if ptr::eq(self, source) {
-                return None;
+        for source in source.parents() {
+            if let Inner::Subtype(source) = source {
+                if ptr::eq(self, source) {
+                    return None;
+                }
             }
         }
         self.constraint_check.as_ref()

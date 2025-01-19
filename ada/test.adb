@@ -44,6 +44,8 @@ end;
 
 type Meter is range 0 .. 1_000_000;
 type Inch is range 0 .. 123;
+subtype Minute is Integer range 0 .. 59;
+subtype SmallMinute is Minute range 0 .. 11;
 
 -- function "+"(lhs: Meter; rhs: Meter) return Meter is
 -- begin
@@ -73,7 +75,7 @@ type Inch is range 0 .. 123;
 --    d := Day'Pred(Wtf);
 
 type Day is (Mon, Tue, Wed, Thu, Fri, Sat, Sun);
--- type Weekday is (Mon, Tue, Wed, Thu, Fri);
+type Weekend is (Sat, Sun);
 subtype Weekday is Day range Mon .. Fri;
 
 procedure Main is
@@ -110,9 +112,11 @@ begin
    Print(Inch'(123));
    Print(Meter'(123));
    Print(Integer'(123));
-   Print(Sat);
    Print(Day'(Sat));
+   Print(Weekend'(Sat));
    -- Print(Weekday'(Sat)); --> Constraint_Error
+
+   Print(Minute'(Integer'(SmallMinute'(5))));
    
    Print("End");
 end;
