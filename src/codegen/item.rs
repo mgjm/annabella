@@ -1,11 +1,11 @@
 use crate::{
-    parser::{Function, Item, Variable},
+    parser::{Function, Item, ParamMode, Variable},
     Result,
 };
 
 use super::{
-    CCode, CodeGenStmt, Context, FunctionType, FunctionValue, IdentBuilder, Permission, Type,
-    Value, VariableValue,
+    ArgumentType, CCode, CodeGenStmt, Context, FunctionType, FunctionValue, IdentBuilder,
+    Permission, Type, Value, VariableValue,
 };
 
 impl CodeGenStmt for Item {
@@ -46,13 +46,22 @@ impl CodeGenStmt for Function {
             .map(|arg| {
                 let ty = Type::from_ident(&arg.ty, &sub_ctx)?;
                 let ident = IdentBuilder::variable(&arg.name);
-                let code = c_code! { #ty #ident };
+                let ref_ = match arg.mode {
+                    ParamMode::In(_) => c_code!(),
+                    ParamMode::Out(_) | ParamMode::InOut(_) => c_code! { * },
+                };
+                let perm = match arg.mode {
+                    ParamMode::In(_) => Permission::Read,
+                    ParamMode::Out(_) => Permission::ReadWrite,
+                    ParamMode::InOut(_) => Permission::ReadWrite,
+                };
+                let code = c_code! { #ty #ref_ const #ident };
                 sub_ctx.insert(
                     &arg.name,
                     Value::Variable(VariableValue {
-                        name: c_code! { #ident },
+                        name: c_code! { #ref_ #ident },
                         ty,
-                        perm: Permission::Read,
+                        perm,
                     }),
                 )?;
                 Ok(code)
@@ -87,7 +96,13 @@ impl CodeGenStmt for Function {
 
         let args = self
             .args()
-            .map(|arg| Type::from_ident(&arg.ty, ctx))
+            .map(|arg| {
+                let ty = Type::from_ident(&arg.ty, ctx)?;
+                Ok(ArgumentType {
+                    ty,
+                    mode: (&arg.mode).into(),
+                })
+            })
             .collect::<Result<Vec<_>>>()?;
 
         let return_type = if let Some(ty) = self.return_type() {

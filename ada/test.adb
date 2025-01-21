@@ -12,11 +12,17 @@ type Date is
       Year : Year;
    end record;
 
+procedure Next(d: in out Date) is
+begin
+   d.Day := d.Day + 1;
+   Print(d);
+end;
+
 function Next(d: Date) return Date is
    r: Date;
 begin
    r := d;
-   r.Day := r.Day + 1;
+   Next(r);
    return r;
 end;
 

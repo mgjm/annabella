@@ -112,6 +112,7 @@ parse!({
     struct Param {
         name: Ident,
         colon: Token![:],
+        mode: ParamMode,
         ty: Ident,
     }
 });
@@ -121,10 +122,38 @@ impl Parse for Param {
         Ok(Self {
             name: input.parse()?,
             colon: input.parse()?,
+            mode: input.parse()?,
             ty: input.parse()?,
         })
     }
 }
+
+parse!({
+    enum ParamMode {
+        In(Option<Token![in]>),
+        Out(Token![out]),
+        InOut(InOut),
+    }
+});
+
+impl Parse for ParamMode {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let in_ = input.try_parse()?;
+        let out = input.try_parse()?;
+        Ok(match (in_, out) {
+            (in_, None) => Self::In(in_),
+            (None, Some(out)) => Self::Out(out),
+            (Some(in_), Some(out)) => Self::InOut(InOut { in_, out }),
+        })
+    }
+}
+
+parse!({
+    struct InOut {
+        in_: Token![in],
+        out: Token![out],
+    }
+});
 
 parse!({
     enum TypeItem {

@@ -9,7 +9,8 @@ use crate::{
 };
 
 use super::{
-    CCode, CodeGenExpr, CompileTimeValue, Context, ExprValue, Permission, SingleExprValue, Type,
+    ArgumentMode, CCode, CodeGenExpr, CompileTimeValue, Context, ExprValue, Permission,
+    SingleExprValue, Type,
 };
 
 impl CodeGenExpr for Expr {
@@ -177,7 +178,13 @@ where
             }
 
             args.zip(&ty.args)
-                .map(|(arg, ty)| arg.generate_with_type_and_check(ty, ctx))
+                .map(|(arg, arg_ty)| {
+                    let code = arg.generate_with_type_and_check(&arg_ty.ty, ctx)?;
+                    Ok(match arg_ty.mode {
+                        ArgumentMode::In => code,
+                        ArgumentMode::Out | ArgumentMode::InOut => c_code! { & #code },
+                    })
+                })
                 .collect::<Result<Vec<_>>>()?
         };
         Ok(SingleExprValue {

@@ -1,5 +1,5 @@
 use crate::{
-    codegen::TypeValue,
+    codegen::{ArgumentMode, ArgumentType, TypeValue},
     parser::{EnumTypeDefinition, Expr, Range, SignedTypeDefinition},
     tokenizer::{Ident, Span},
     Result, Token,
@@ -90,7 +90,7 @@ pub(crate) fn generate_signed_ops(ty: &Type, ctx: &mut Context) -> Result<()> {
                     code = c_code! { #constraint_check(#code) }
                 }
                 ctx.push_function(c_code! {
-                    #ty #ident(#ty lhs, #ty rhs) {
+                    #ty #ident(#ty const lhs, #ty const rhs) {
                         return #code;
                     }
                 });
@@ -100,7 +100,16 @@ pub(crate) fn generate_signed_ops(ty: &Type, ctx: &mut Context) -> Result<()> {
                     Value::Function(FunctionValue::new(
                          c_code! { #ident },
                          Type::function(FunctionType {
-                            args: vec![ty.clone(), ty.clone()],
+                            args: vec![
+                                ArgumentType {
+                                    ty: ty.clone(),
+                                    mode: ArgumentMode::In,
+                                },
+                                ArgumentType {
+                                    ty: ty.clone(),
+                                    mode: ArgumentMode::In,
+                                },
+                            ],
                             return_type: ty.clone(),
                         })
                     )),
@@ -134,7 +143,7 @@ pub(crate) fn generate_modular_ops(ty: &Type, modulus: &CCode, ctx: &mut Context
                     let code = c_code! { (#code $($map)*) };
                 )?
                 ctx.push_function(c_code! {
-                    #ty #ident(#ty lhs, #ty rhs) {
+                    #ty #ident(#ty const lhs, #ty const rhs) {
                         return #code % #modulus;
                     }
                 });
@@ -144,7 +153,16 @@ pub(crate) fn generate_modular_ops(ty: &Type, modulus: &CCode, ctx: &mut Context
                     Value::Function(FunctionValue::new(
                          c_code! { #ident },
                          Type::function(FunctionType {
-                            args: vec![ty.clone(), ty.clone()],
+                            args: vec![
+                                ArgumentType {
+                                    ty: ty.clone(),
+                                    mode: ArgumentMode::In,
+                                },
+                                ArgumentType {
+                                    ty: ty.clone(),
+                                    mode: ArgumentMode::In,
+                                },
+                            ],
                             return_type: ty.clone(),
                         })
                     )),
@@ -174,7 +192,7 @@ pub(crate) fn generate_boolean_logical_ops(ty: &Type, ctx: &mut Context) -> Resu
                 let op: Token![$ada] = Default::default();
                 let ident = IdentBuilder::op_function(op, ty);
                 ctx.push_function(c_code! {
-                    #ty #ident(#ty lhs, #ty rhs) {
+                    #ty #ident(#ty const lhs, #ty const rhs) {
                         return lhs $c rhs;
                     }
                 });
@@ -184,7 +202,16 @@ pub(crate) fn generate_boolean_logical_ops(ty: &Type, ctx: &mut Context) -> Resu
                     Value::Function(FunctionValue::new(
                          c_code! { #ident },
                          Type::function(FunctionType {
-                            args: vec![ty.clone(), ty.clone()],
+                            args: vec![
+                                ArgumentType {
+                                    ty: ty.clone(),
+                                    mode: ArgumentMode::In,
+                                },
+                                ArgumentType {
+                                    ty: ty.clone(),
+                                    mode: ArgumentMode::In,
+                                },
+                            ],
                             return_type: ty.clone(),
                         })
                     )),
@@ -211,7 +238,7 @@ pub(crate) fn generate_comparison_ops(ty: &Type, ctx: &mut Context) -> Result<()
                 let op: Token![$ada] = Default::default();
                 let ident = IdentBuilder::op_function(op, ty);
                 ctx.push_function(c_code! {
-                    #boolean #ident(#ty lhs, #ty rhs) {
+                    #boolean #ident(#ty const lhs, #ty const rhs) {
                         return lhs $c rhs;
                     }
                 });
@@ -221,7 +248,16 @@ pub(crate) fn generate_comparison_ops(ty: &Type, ctx: &mut Context) -> Result<()
                     Value::Function(FunctionValue::new(
                          c_code! { #ident },
                          Type::function(FunctionType {
-                            args: vec![ty.clone(), ty.clone()],
+                            args: vec![
+                                ArgumentType {
+                                    ty: ty.clone(),
+                                    mode: ArgumentMode::In,
+                                },
+                                ArgumentType {
+                                    ty: ty.clone(),
+                                    mode: ArgumentMode::In,
+                                },
+                            ],
                             return_type: boolean.clone(),
                         })
                     )),
@@ -265,7 +301,7 @@ pub fn generate_custom_print(ty: Type, code: CCode, ctx: &mut Context) -> Result
 
     let ident = IdentBuilder::print(&ty);
     ctx.push_function(c_code! {
-        void #ident(#ty self) {
+        void #ident(#ty const self) {
             #code
         }
     });
@@ -275,7 +311,10 @@ pub fn generate_custom_print(ty: Type, code: CCode, ctx: &mut Context) -> Result
         Value::Function(FunctionValue::new(
             c_code! { #ident },
             Type::function(FunctionType {
-                args: vec![ty],
+                args: vec![ArgumentType {
+                    ty,
+                    mode: ArgumentMode::In,
+                }],
                 return_type: Type::void(),
             }),
         )),

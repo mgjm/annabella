@@ -4,12 +4,12 @@ use quote::ToTokens;
 
 use crate::{
     codegen::IdentBuilder,
-    parser::SelectorName,
+    parser::{ParamMode, SelectorName},
     tokenizer::{Ident, Span, Spanned},
     Result,
 };
 
-use super::{CCode, Context, ExprValue, Permission, SingleExprValue, Value};
+use super::{CCode, Context, ExprValue, SingleExprValue, Value};
 
 #[derive(Clone)]
 pub struct Type(Rc<Inner>);
@@ -295,7 +295,7 @@ impl TypeImpl for StringType {
 
 #[derive(Debug)]
 pub struct FunctionType {
-    pub args: Vec<Type>,
+    pub args: Vec<ArgumentType>,
     pub return_type: Type,
 }
 
@@ -318,6 +318,35 @@ impl TypeImpl for FunctionType {
 
     fn needs_constraint_check(&self, _target: &Type) -> Option<&CCode> {
         None
+    }
+}
+
+#[derive(Debug)]
+pub struct ArgumentType {
+    pub ty: Type,
+    pub mode: ArgumentMode,
+}
+
+#[derive(Debug)]
+pub enum ArgumentMode {
+    In,
+    Out,
+    InOut,
+}
+
+impl From<ParamMode> for ArgumentMode {
+    fn from(value: ParamMode) -> Self {
+        Self::from(&value)
+    }
+}
+
+impl From<&ParamMode> for ArgumentMode {
+    fn from(value: &ParamMode) -> Self {
+        match value {
+            ParamMode::In(_) => Self::In,
+            ParamMode::Out(_) => Self::Out,
+            ParamMode::InOut(_) => Self::InOut,
+        }
     }
 }
 
@@ -421,7 +450,7 @@ impl TypeImpl for RecordType {
         Ok(SingleExprValue {
             ty: field.ty.clone(),
             perm: prefix.perm,
-            code: c_code! { #prefix.#ident },
+            code: c_code! { (#prefix).#ident },
             value: None,
         }
         .into())
