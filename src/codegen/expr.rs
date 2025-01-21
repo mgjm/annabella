@@ -1,7 +1,10 @@
+use std::iter;
+
 use crate::{
     parser::{
-        BaseName, BinaryOp, Expr, ExprBinary, ExprLit, ExprShortCircuit, FunctionCall, LitChar,
-        LitNumber, LitStr, Name, QualifiedExpr, QualifiedExprValue, QualifiedExprValueExpr,
+        AggregateExpr, BaseName, BinaryOp, ComponentChoices, Expr, ExprBinary, ExprLit,
+        ExprShortCircuit, FunctionCall, LitChar, LitNumber, LitStr, Name, QualifiedExpr,
+        QualifiedExprValue, QualifiedExprValueExpr, RecordComponentAssociationList,
         SelectedComponent, ShortCircuitOp,
     },
     tokenizer::{Ident, Span, Spanned},
@@ -9,8 +12,8 @@ use crate::{
 };
 
 use super::{
-    ArgumentMode, CCode, CodeGenExpr, CompileTimeValue, Context, ExprValue, Permission,
-    SingleExprValue, Type,
+    ArgumentMode, CCode, CodeGenExpr, CompileTimeValue, Context, DynamicExprValue, ExprValue,
+    Permission, SingleExprValue, Type,
 };
 
 impl CodeGenExpr for Expr {
@@ -20,6 +23,7 @@ impl CodeGenExpr for Expr {
             Self::Lit(expr) => expr.generate(ctx),
             Self::Name(expr) => expr.generate(ctx)?.implicit_dereference(ctx),
             Self::Qualified(expr) => expr.generate(ctx),
+            Self::Aggregate(expr) => expr.generate(ctx),
             Self::Unary(expr) => todo!(),
             Self::Binary(expr) => expr.generate(ctx),
             Self::ShortCircuit(expr) => expr.generate(ctx),
@@ -133,6 +137,80 @@ impl CodeGenExpr for QualifiedExprValue {
 impl CodeGenExpr for QualifiedExprValueExpr {
     fn generate(&self, ctx: &mut Context) -> Result<ExprValue> {
         self.expr.generate(ctx)
+    }
+}
+
+impl CodeGenExpr for AggregateExpr {
+    fn generate(&self, ctx: &mut Context) -> Result<ExprValue> {
+        match self {
+            Self::Record(aggregate) => aggregate.generate(ctx),
+        }
+    }
+}
+
+impl CodeGenExpr for RecordComponentAssociationList {
+    fn generate(&self, ctx: &mut Context) -> Result<ExprValue> {
+        let associations = self
+            .associations
+            .iter()
+            .map(|association| {
+                let expr = association.expr.generate(ctx)?;
+                Ok((
+                    association.choices.as_ref().map(|(c, _)| c.clone()),
+                    association.expr.span(),
+                    expr,
+                ))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let span = self.span();
+
+        Ok(DynamicExprValue::new(span, move |ty| {
+            let Some(record) = ty.as_record() else {
+                return Err(span.unrecoverable_error("expected to be a record"));
+            };
+
+            let mut values: Vec<Option<CCode>> = vec![None; record.fields.len()];
+            for (i, (choices, span, expr)) in associations.iter().enumerate() {
+                let expr = |ty| Ok(expr.clone().filter_type(span, ty)?.with_check(ty));
+                match choices {
+                    None => {
+                        values[i] = Some(expr(&record.fields[i].ty)?);
+                    }
+                    Some(ComponentChoices::Names(names)) => {
+                        for name in names.iter() {
+                            let Some((i, _, field)) = record.fields.get_full(&name.name) else {
+                                return Err(name.unrecoverable_error("unknown field name"));
+                            };
+                            values[i] = Some(expr(&field.ty)?);
+                        }
+                    }
+                    Some(ComponentChoices::Others(_)) => {
+                        for (field, value) in record.fields.values().zip(&mut values) {
+                            if value.is_none() {
+                                *value = Some(expr(&field.ty)?);
+                            }
+                        }
+                    }
+                }
+            }
+            let values = iter::zip(record.fields.values(), values).map(|(field, v)| {
+                let ty = &field.ty;
+                v.unwrap_or_else(|| c_code! { (#ty){} })
+            });
+
+            Ok(SingleExprValue {
+                ty: ty.clone(),
+                perm: Permission::Read,
+                code: c_code! {
+                    (#ty){
+                        #(#values,)*
+                    }
+                },
+                value: None,
+            }
+            .into())
+        })
+        .into())
     }
 }
 

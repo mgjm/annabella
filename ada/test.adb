@@ -31,9 +31,13 @@ procedure Main is
 begin
    Print("Start");
 
-   d.Day := 21;
-   d.Month := Jan;
-   d.Year := 2025;
+   d := (21, Jan, 2025);
+   Print(d);
+
+   d := (Day => 21, Month => Jan, Year => 2025);
+   Print(d);
+
+   d := (Day => 21, Month => Jan, others => 2025);
    Print(d);
 
    for i in 1 .. 10 loop

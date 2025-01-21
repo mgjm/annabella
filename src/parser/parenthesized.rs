@@ -134,6 +134,12 @@ pub struct Punctuated<T, P = Token![,]> {
     inner: Vec<(T, Option<P>)>,
 }
 
+impl<T, P> Default for Punctuated<T, P> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T, P> fmt::Debug for Punctuated<T, P>
 where
     T: fmt::Debug,
@@ -154,12 +160,18 @@ where
     }
 }
 
+impl<T, P> Punctuated<T, P> {
+    pub const fn new() -> Self {
+        Self { inner: Vec::new() }
+    }
+}
+
 impl<T, P> Punctuated<T, P>
 where
     T: Parse,
     P: Parse,
 {
-    fn parse_all(input: ParseStream) -> Result<Self> {
+    pub fn parse_all(input: ParseStream) -> Result<Self> {
         let mut inner = vec![(input.parse()?, None)];
 
         while !input.is_empty() {
@@ -180,6 +192,14 @@ where
 }
 
 impl<T, P> Punctuated<T, P> {
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
     pub fn iter(&self) -> impl ExactSizeIterator<Item = &T> + Clone {
         self.inner.iter().map(|(item, _)| item)
     }

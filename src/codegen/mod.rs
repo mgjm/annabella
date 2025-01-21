@@ -1,3 +1,5 @@
+use std::{fmt, rc::Rc};
+
 use quote::ToTokens;
 
 use crate::{
@@ -36,14 +38,15 @@ pub fn run(items: Vec<Item>) -> Result<String> {
         name: "main".into(),
         span: Span::call_site(),
     };
-    let Some(ExprValue::Distinct(value)) = ctx.get(&ident)?.expr_value().filter(|value| {
-        matches!(
-            value.ty.as_function(),
-            Some(ty) if ty.args.is_empty() && ty.return_type.is_void(),
-        )
-    }) else {
-        return Err(ident.unrecoverable_error("main function not found"));
-    };
+    let value = ctx
+        .get(&ident)?
+        .expr_value()
+        .filter_distinct(&ident, |value| {
+            matches!(
+                value.ty.as_function(),
+                Some(ty) if ty.args.is_empty() && ty.return_type.is_void(),
+            )
+        })?;
     ctx.push_main(c_code! { #value(); });
 
     Ok(ctx.to_string())
@@ -61,6 +64,7 @@ trait CodeGenType {
 enum ExprValue {
     Distinct(SingleExprValue),
     Ambiguous(Vec<SingleExprValue>),
+    Dynamic(DynamicExprValue),
 }
 
 impl Spanned for ExprValue {
@@ -100,6 +104,11 @@ impl ExprValue {
                     match f(value) {
                         Ok(Self::Distinct(value)) => new_values.push(value),
                         Ok(Self::Ambiguous(values)) => new_values.extend(values),
+                        Ok(Self::Dynamic(values)) => {
+                            return Err(
+                                values.unrecoverable_error("dynamic expression type not allowed")
+                            )
+                        }
                         Err(err) => {
                             last_err = Some(err);
                         }
@@ -107,103 +116,109 @@ impl ExprValue {
                 }
                 Self::new(new_values).ok_or_else(|| last_err.unwrap())
             }
+            Self::Dynamic(values) => {
+                return Err(values.unrecoverable_error("dynamic expression type not allowed"))
+            }
         }
     }
 
-    fn filter(self, mut f: impl FnMut(&SingleExprValue) -> bool) -> Option<Self> {
-        match self {
-            Self::Distinct(value) => {
+    fn filter_type(mut self, span: &impl Spanned, ty: &Type) -> Result<SingleExprValue> {
+        Ok(loop {
+            self = match self {
+                ExprValue::Distinct(value) => {
+                    if ty.can_assign(&value.ty) {
+                        break value;
+                    } else {
+                        return Err(span.unrecoverable_error("expression type not allowed"));
+                    }
+                }
+                ExprValue::Ambiguous(values) => {
+                    let mut values = values.into_iter().filter(|value| ty.can_assign(&value.ty));
+                    let Some(value) = values.next() else {
+                        return Err(span.unrecoverable_error("expression type not allowed"));
+                    };
+                    if values.next().is_some() {
+                        return Err(span.unrecoverable_error("ambiguous expression"));
+                    } else {
+                        break value;
+                    }
+                }
+                ExprValue::Dynamic(value) => value.generate(ty)?,
+            }
+        })
+    }
+
+    fn filter_distinct(
+        self,
+        span: &impl Spanned,
+        mut f: impl FnMut(&SingleExprValue) -> bool,
+    ) -> Result<SingleExprValue> {
+        Ok(match self {
+            ExprValue::Distinct(value) => {
                 if f(&value) {
-                    Some(Self::Distinct(value))
+                    value
                 } else {
-                    None
+                    return Err(span.unrecoverable_error("expression type not allowed"));
                 }
             }
-            Self::Ambiguous(values) => Self::new(values.into_iter().filter(f)),
-        }
+            ExprValue::Ambiguous(values) => {
+                let mut values = values.into_iter().filter(f);
+                let Some(value) = values.next() else {
+                    return Err(span.unrecoverable_error("expression type not allowed"));
+                };
+                if values.next().is_some() {
+                    return Err(span.unrecoverable_error("ambiguous expression"));
+                } else {
+                    value
+                }
+            }
+            ExprValue::Dynamic(_) => {
+                return Err(span.unrecoverable_error("dynamic expression type not allowed"))
+            }
+        })
     }
-
-    // fn as_slice(&self) -> &[SingleExprValue] {
-    //     match self {
-    //         Self::Distinct(value) => std::slice::from_ref(value),
-    //         Self::Ambiguous(values) => values,
-    //     }
-    // }
-
-    // fn iter(&self) -> impl Iterator<Item = &SingleExprValue> {
-    //     self.as_slice().iter()
-    // }
-
-    // fn all_combinations(
-    //     list: Vec<Self>,
-    //     mut f: impl FnMut(&[&SingleExprValue]) -> Result<Self>,
-    // ) -> Result<Self> {
-    //     if list.iter().all(|item| matches!(*item, Self::Ambiguous(_))) {
-    //         let current: Vec<_> = list
-    //             .iter()
-    //             .map(|item| match item {
-    //                 Self::Distinct(value) => value,
-    //                 Self::Ambiguous(_) => unreachable!(),
-    //             })
-    //             .collect();
-    //         return f(&current);
-    //     }
-
-    //     struct ResettableIter<'a, T> {
-    //         values: &'a [T],
-    //         index: usize,
-    //     }
-
-    //     impl<'a, T> ResettableIter<'a, T> {
-    //         fn next(&mut self) -> Option<&'a T> {
-    //             let value = self.values.get(self.index)?;
-    //             self.index += 1;
-    //             Some(value)
-    //         }
-
-    //         fn reset(&mut self) -> &'a T {
-    //             self.index = 0;
-    //             self.next().unwrap()
-    //         }
-    //     }
-
-    //     let mut iters: Vec<_> = list
-    //         .iter()
-    //         .map(|item| ResettableIter {
-    //             values: item.as_slice(),
-    //             index: 0,
-    //         })
-    //         .collect();
-    //     let mut current: Vec<_> = iters.iter_mut().map(|iter| iter.next().unwrap()).collect();
-
-    //     let mut last_err = None;
-    //     let mut new_values = Vec::new();
-    //     'outer: loop {
-    //         match f(&current) {
-    //             Ok(Self::Distinct(value)) => new_values.push(value),
-    //             Ok(Self::Ambiguous(values)) => new_values.extend(values),
-    //             Err(err) => {
-    //                 last_err = Some(err);
-    //             }
-    //         }
-
-    //         for (iter, value) in std::iter::zip(&mut iters, &mut current) {
-    //             if let Some(v) = iter.next() {
-    //                 *value = v;
-    //                 continue 'outer;
-    //             } else {
-    //                 *value = iter.reset();
-    //             }
-    //         }
-    //         break;
-    //     }
-    //     Self::new(new_values).ok_or_else(|| last_err.unwrap())
-    // }
 }
 
 impl From<SingleExprValue> for ExprValue {
     fn from(value: SingleExprValue) -> Self {
         Self::Distinct(value)
+    }
+}
+
+impl From<DynamicExprValue> for ExprValue {
+    fn from(value: DynamicExprValue) -> Self {
+        Self::Dynamic(value)
+    }
+}
+
+#[derive(Clone)]
+struct DynamicExprValue {
+    span: Span,
+    generate: Rc<dyn Fn(&Type) -> Result<ExprValue>>,
+}
+
+impl fmt::Debug for DynamicExprValue {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("DynamicExprValue").finish_non_exhaustive()
+    }
+}
+
+impl Spanned for DynamicExprValue {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl DynamicExprValue {
+    fn new(span: Span, generate: impl Fn(&Type) -> Result<ExprValue> + 'static) -> Self {
+        Self {
+            span,
+            generate: Rc::new(generate),
+        }
+    }
+
+    fn generate(&self, ty: &Type) -> Result<ExprValue> {
+        (self.generate)(ty)
     }
 }
 
@@ -237,33 +252,30 @@ struct SingleExprValue {
     value: Option<CompileTimeValue>,
 }
 
+impl SingleExprValue {
+    fn with_check(self, ty: &Type) -> CCode {
+        if let Some(constraint_check) = ty.needs_constraint_check(&self.ty) {
+            let code = self.code;
+            c_code! {
+                #constraint_check(#code)
+            }
+        } else {
+            self.code
+        }
+    }
+}
+
 impl ToTokens for SingleExprValue {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         self.code.to_tokens(tokens)
     }
 }
 
-trait CodeGenExpr: Spanned {
+trait CodeGenExpr: Spanned + Sized {
     fn generate(&self, ctx: &mut Context) -> Result<ExprValue>;
 
     fn generate_with_type_and_check(&self, ty: &Type, ctx: &mut Context) -> Result<CCode> {
-        let expr = match self.generate(ctx)?.filter(|value| ty.can_assign(&value.ty)) {
-            Some(ExprValue::Distinct(expr)) => expr,
-            Some(ExprValue::Ambiguous(_)) => {
-                return Err(self.unrecoverable_error("ambiguous expression"));
-            }
-            None => {
-                return Err(self.unrecoverable_error("expression type not allowed"));
-            }
-        };
-        if let Some(constraint_check) = ty.needs_constraint_check(&expr.ty) {
-            let code = expr.code;
-            Ok(c_code! {
-                #constraint_check(#code)
-            })
-        } else {
-            Ok(expr.code)
-        }
+        Ok(self.generate(ctx)?.filter_type(self, ty)?.with_check(ty))
     }
 
     fn generate_to_boolean(&self, ctx: &mut Context) -> Result<CCode> {

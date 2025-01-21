@@ -1,4 +1,4 @@
-use std::collections::{btree_map::Entry, BTreeMap};
+use indexmap::{map::Entry, IndexMap};
 
 use crate::{
     parser::{
@@ -6,7 +6,7 @@ use crate::{
         Range, RangeConstraint, RecordComponentList, RecordTypeDefinition, SignedTypeDefinition,
         SubtypeItem, TypeDefinition, TypeItem, Variable,
     },
-    tokenizer::{Ident, Spanned},
+    tokenizer::{Ident, Span, Spanned},
     Result,
 };
 
@@ -191,7 +191,7 @@ impl CodeGenType for RecordTypeDefinition {
         let mut ty = RecordType {
             name: name.clone(),
             ident: ident.clone(),
-            fields: BTreeMap::new(),
+            fields: IndexMap::new(),
         };
 
         let struct_code = self.components.generate(&mut ty, ctx)?;
@@ -205,7 +205,7 @@ impl CodeGenType for RecordTypeDefinition {
             .iter()
             .map(|(name, field)| {
                 let ident = &field.ident;
-                let Some(ExprValue::Distinct(value)) = generate_function_call(
+                let value = generate_function_call(
                     &Name::Base(BaseName::Ident(standard::print())),
                     [&ExprValue::from(SingleExprValue {
                         ty: field.ty.clone(),
@@ -216,9 +216,7 @@ impl CodeGenType for RecordTypeDefinition {
                     .into_iter(),
                     ctx,
                 )?
-                .filter(|v| v.ty.is_void()) else {
-                    unreachable!("print function not distinct");
-                };
+                .filter_type(&Span::call_site(), &Type::void())?;
                 let code = value.code;
                 Ok(c_code! {
                     printf("  %s => ", #name);

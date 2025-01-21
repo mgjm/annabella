@@ -1,5 +1,6 @@
-use std::{collections::BTreeMap, fmt, mem, ptr, rc::Rc};
+use std::{fmt, mem, ptr, rc::Rc};
 
+use indexmap::IndexMap;
 use quote::ToTokens;
 
 use crate::{
@@ -139,6 +140,13 @@ impl Type {
     pub fn as_function(&self) -> Option<&FunctionType> {
         match self.inner() {
             Inner::Function(ty) => Some(ty),
+            _ => None,
+        }
+    }
+
+    pub fn as_record(&self) -> Option<&RecordType> {
+        match self.inner() {
+            Inner::Record(ty) => Some(ty),
             _ => None,
         }
     }
@@ -416,7 +424,7 @@ impl TypeImpl for SignedType {
 pub struct RecordType {
     pub name: Ident,
     pub ident: proc_macro2::Ident,
-    pub fields: BTreeMap<Box<str>, RecordField>,
+    pub fields: IndexMap<Box<str>, RecordField>,
 }
 
 impl TypeImpl for RecordType {

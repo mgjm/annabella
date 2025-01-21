@@ -225,6 +225,19 @@ impl ParseBuffer<'_> {
         result
     }
 
+    fn parse_all<T>(&mut self) -> Result<Vec<T>>
+    where
+        T: Parse,
+    {
+        self.call(|input| {
+            let mut vec = Vec::new();
+            while !input.is_empty() {
+                vec.push(input.parse()?);
+            }
+            Ok(vec)
+        })
+    }
+
     fn parse_until_peeked<T, F>(&mut self, token: F) -> Result<Vec<T>>
     where
         T: Parse,

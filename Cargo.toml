@@ -9,5 +9,6 @@ span-locations = []
 
 [dependencies]
 anyhow = "1.0.95"
+indexmap = "2.7.1"
 proc-macro2 = { version = "1.0.93", default-features = false }
 quote = { version = "1.0.38", default-features = false }

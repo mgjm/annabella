@@ -3,13 +3,14 @@ use crate::{
     Result, Token,
 };
 
-use super::{Parenthesized, ParenthesizedOne, Parse, ParseStream, Range};
+use super::{Parenthesized, ParenthesizedOne, Parse, ParseStream, Punctuated, Range};
 
 parse!({
     enum Expr {
         Lit(ExprLit),
         Name(Name),
         Qualified(QualifiedExpr),
+        Aggregate(AggregateExpr),
         Unary(ExprUnary),
         Binary(ExprBinary),
         ShortCircuit(ExprShortCircuit),
@@ -225,6 +226,8 @@ impl Expr {
     fn parse_primary(input: ParseStream) -> Result<Self> {
         Ok(if let Some(lit) = input.try_parse()? {
             Self::Lit(lit)
+        } else if let Some(aggregate) = input.try_parse()? {
+            Self::Aggregate(aggregate)
         } else if let Some(name) = input.try_parse()? {
             if let Some(tick) = input.try_parse()? {
                 Self::Qualified(QualifiedExpr {
@@ -395,6 +398,32 @@ impl Parse for BaseName {
         Ok(Self::Ident(input.parse()?))
     }
 }
+parse!({
+    struct SelectedComponent {
+        prefix: Box<Name>,
+        dot: Token![.],
+        name: SelectorName,
+    }
+});
+
+parse!({
+    enum SelectorName {
+        Ident(Ident),
+    }
+});
+
+impl Parse for SelectorName {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(Self::Ident(input.parse()?))
+    }
+}
+
+parse!({
+    struct FunctionCall {
+        name: Box<Name>,
+        args: Parenthesized<Expr>,
+    }
+});
 
 parse!({
     struct QualifiedExpr {
@@ -431,31 +460,120 @@ impl Parse for QualifiedExprValueExpr {
 }
 
 parse!({
-    struct SelectedComponent {
-        prefix: Box<Name>,
-        dot: Token![.],
-        name: SelectorName,
+    enum AggregateExpr {
+        Record(ParenthesizedOne<RecordComponentAssociationList>),
     }
 });
 
-parse!({
-    enum SelectorName {
-        Ident(Ident),
-    }
-});
-
-impl Parse for SelectorName {
-    fn parse(input: ParseStream) -> Result<Self> {
-        Ok(Self::Ident(input.parse()?))
+impl Parse for AggregateExpr {
+    fn parse(input: ParseStream) -> crate::Result<Self> {
+        Ok(if let Some(aggregate) = input.try_parse()? {
+            Self::Record(aggregate)
+        } else {
+            return Err(input.recoverable_error("expected aggregate"));
+        })
     }
 }
 
 parse!({
-    struct FunctionCall {
-        name: Box<Name>,
-        args: Parenthesized<Expr>,
+    struct RecordComponentAssociationList {
+        associations: Punctuated<RecordComponentAssociation>,
     }
 });
+
+impl RecordComponentAssociationList {
+    fn validate(
+        associations: Punctuated<RecordComponentAssociation>,
+    ) -> Result<Punctuated<RecordComponentAssociation>> {
+        if let Some(association) = associations.iter().next() {
+            if associations.len() == 1 && association.choices.is_none() {
+                return Err(association.recoverable_error("not an aggregate"));
+            }
+        }
+        {
+            let mut iter = associations.iter();
+
+            'outer: {
+                for association in &mut iter {
+                    match association.choices {
+                        Some((ComponentChoices::Others(_), _)) => break 'outer,
+                        Some((ComponentChoices::Names(_), _)) => break,
+                        None => continue,
+                    }
+                }
+                for association in &mut iter {
+                    match association.choices {
+                        Some((ComponentChoices::Others(_), _)) => break 'outer,
+                        Some((ComponentChoices::Names(_), _)) => continue,
+                        None => {
+                            return Err(association.unrecoverable_error(
+                                "positional component needs to be before named components",
+                            ))
+                        }
+                    }
+                }
+            }
+
+            if let Some(association) = iter.next() {
+                return Err(association.unrecoverable_error("unexpected component after others"));
+            }
+        }
+        Ok(associations)
+    }
+}
+
+impl Parse for RecordComponentAssociationList {
+    fn parse(input: ParseStream) -> crate::Result<Self> {
+        let associations = if let Some(()) = input.try_call(|input| {
+            let _: Token![null] = input.parse()?;
+            let _: Token![record] = input.parse()?;
+            Ok(())
+        })? {
+            Punctuated::new()
+        } else {
+            Self::validate(input.call(Punctuated::parse_all)?)?
+        };
+
+        Ok(Self { associations })
+    }
+}
+
+parse!({
+    struct RecordComponentAssociation {
+        choices: Option<(ComponentChoices, Token![=>])>,
+        expr: Expr,
+    }
+});
+
+impl Parse for RecordComponentAssociation {
+    fn parse(input: ParseStream) -> crate::Result<Self> {
+        Ok(Self {
+            choices: input.try_call(|input| {
+                let choices = input.parse()?;
+                let arrow = input.parse()?;
+                Ok((choices, arrow))
+            })?,
+            expr: input.parse()?,
+        })
+    }
+}
+
+parse!({
+    enum ComponentChoices {
+        Others(Token![others]),
+        Names(Punctuated<Ident, Token![|]>),
+    }
+});
+
+impl Parse for ComponentChoices {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(if let Some(others) = input.try_parse()? {
+            Self::Others(others)
+        } else {
+            Self::Names(input.call(Punctuated::parse_while)?)
+        })
+    }
+}
 
 parse!({
     struct ExprUnary {
