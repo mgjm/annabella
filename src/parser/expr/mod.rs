@@ -357,6 +357,7 @@ impl ParseNumber for i64 {
 parse!({
     enum Name {
         Base(BaseName),
+        Select(SelectedComponent),
         FunctionCall(FunctionCall),
     }
 });
@@ -365,7 +366,13 @@ impl Parse for Name {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut name = Self::Base(input.parse()?);
         Ok(loop {
-            name = if let Some(args) = input.try_parse()? {
+            name = if let Some(dot) = input.try_parse()? {
+                Self::Select(SelectedComponent {
+                    prefix: name.into(),
+                    dot,
+                    name: input.parse()?,
+                })
+            } else if let Some(args) = input.try_parse()? {
                 Self::FunctionCall(FunctionCall {
                     name: name.into(),
                     args,
@@ -420,6 +427,26 @@ impl Parse for QualifiedExprValueExpr {
         Ok(Self {
             expr: input.parse()?,
         })
+    }
+}
+
+parse!({
+    struct SelectedComponent {
+        prefix: Box<Name>,
+        dot: Token![.],
+        name: SelectorName,
+    }
+});
+
+parse!({
+    enum SelectorName {
+        Ident(Ident),
+    }
+});
+
+impl Parse for SelectorName {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(Self::Ident(input.parse()?))
     }
 }
 

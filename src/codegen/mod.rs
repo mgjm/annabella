@@ -57,10 +57,22 @@ trait CodeGenType {
     fn generate(&self, name: &Ident, ctx: &mut Context) -> Result<CCode>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum ExprValue {
     Distinct(SingleExprValue),
     Ambiguous(Vec<SingleExprValue>),
+}
+
+impl Spanned for ExprValue {
+    fn span(&self) -> Span {
+        Span::call_site()
+    }
+}
+
+impl CodeGenExpr for ExprValue {
+    fn generate(&self, _ctx: &mut Context) -> Result<ExprValue> {
+        Ok(self.clone())
+    }
 }
 
 impl ExprValue {
@@ -195,7 +207,19 @@ impl From<SingleExprValue> for ExprValue {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
+pub enum Permission {
+    Read,
+    ReadWrite,
+}
+
+impl Permission {
+    fn can_write(self) -> bool {
+        matches!(self, Self::ReadWrite)
+    }
+}
+
+#[derive(Debug, Clone)]
 #[expect(dead_code)]
 enum CompileTimeValue {
     Character(char),
@@ -204,9 +228,10 @@ enum CompileTimeValue {
     String(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct SingleExprValue {
     ty: Type,
+    perm: Permission,
     code: CCode,
     #[expect(dead_code)]
     value: Option<CompileTimeValue>,

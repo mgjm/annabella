@@ -4,8 +4,8 @@ use crate::{
 };
 
 use super::{
-    CCode, CodeGenStmt, Context, FunctionType, FunctionValue, IdentBuilder, Type, Value,
-    VariableValue,
+    CCode, CodeGenStmt, Context, FunctionType, FunctionValue, IdentBuilder, Permission, Type,
+    Value, VariableValue,
 };
 
 impl CodeGenStmt for Item {
@@ -52,6 +52,7 @@ impl CodeGenStmt for Function {
                     Value::Variable(VariableValue {
                         name: c_code! { #ident },
                         ty,
+                        perm: Permission::Read,
                     }),
                 )?;
                 Ok(code)
@@ -118,6 +119,7 @@ impl CodeGenStmt for Variable {
             Value::Variable(VariableValue {
                 name: c_code! { #ident },
                 ty,
+                perm: Permission::ReadWrite,
             }),
         )?;
         Ok(code)

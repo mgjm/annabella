@@ -28,7 +28,7 @@ pub struct Context<'a> {
 #[derive(Default)]
 struct Inner {
     includes: Vec<&'static str>,
-    types: Vec<CCode>,
+    // types: Vec<CCode>,
     functions: Vec<CCode>,
     main: Vec<CCode>,
 }
@@ -45,7 +45,8 @@ impl Context<'_> {
     }
 
     pub fn push_type(&mut self, code: CCode) {
-        self.inner.types.push(code);
+        // self.inner.types.push(code);
+        self.inner.functions.push(code);
     }
 
     pub fn push_function(&mut self, code: CCode) {
@@ -76,10 +77,10 @@ impl fmt::Display for Context<'_> {
         }
         writeln!(f)?;
 
-        for type_ in &self.inner.types {
-            type_.fmt(f)?;
-        }
-        writeln!(f)?;
+        // for type_ in &self.inner.types {
+        //     type_.fmt(f)?;
+        // }
+        // writeln!(f)?;
 
         for function in &self.inner.functions {
             function.fmt(f)?;

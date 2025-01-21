@@ -9,7 +9,8 @@ use crate::{
 };
 
 use super::{
-    CCode, CodeGenExpr, CodeGenStmt, Context, ExprValue, LabelValue, SingleExprValue, Type, Value,
+    CCode, CodeGenExpr, CodeGenStmt, Context, ExprValue, LabelValue, Permission, SingleExprValue,
+    Type, Value, VariableValue,
 };
 
 impl CodeGenStmt for Stmt {
@@ -58,9 +59,16 @@ impl CodeGenStmt for ExprStmt {
 impl CodeGenStmt for AssignStmt {
     fn generate(&self, ctx: &mut Context) -> Result<CCode> {
         let expr = self.name.generate(ctx)?.flat_map(|name| {
+            if !name.perm.can_write() {
+                return Err(self
+                    .name
+                    .unrecoverable_error("not allowed as an assign destination"));
+            }
+
             let expr = self.expr.generate_with_type_and_check(&name.ty, ctx)?;
             Ok(SingleExprValue {
                 ty: Type::void(),
+                perm: Permission::Read,
                 code: c_code! {
                     #name = #expr;
                 },
@@ -187,73 +195,101 @@ impl CodeGenStmt for LoopStmt {
     fn generate(&self, ctx: &mut Context) -> Result<CCode> {
         let mut sub_ctx = ctx.subscope(ctx.return_type());
 
-        let stmts = self
-            .stmts
-            .iter()
-            .map(|stmt| stmt.generate(&mut sub_ctx))
-            .collect::<Result<Vec<_>>>()?;
+        let stmts = |ctx: &mut Context| {
+            let stmts = self
+                .stmts
+                .iter()
+                .map(|stmt| stmt.generate(ctx))
+                .collect::<Result<Vec<_>>>()?;
 
-        let stmts = c_code! {
-            {
-                #(#stmts)*
-            }
+            let stmts = c_code! {
+                {
+                    #(#stmts)*
+                }
+            };
+
+            Ok(stmts)
         };
 
         let code = match &self.scheme {
-            LoopScheme::Endless(_) => c_code! { while (1) #stmts },
+            LoopScheme::Endless(_) => {
+                let stmts = stmts(&mut sub_ctx)?;
+                c_code! { while (1) #stmts }
+            }
             LoopScheme::While(scheme) => {
-                let cond = scheme.cond.generate_to_boolean(ctx)?;
+                let cond = scheme.cond.generate_to_boolean(&mut sub_ctx)?;
+                let stmts = stmts(&mut sub_ctx)?;
                 c_code! { while (#cond) #stmts }
             }
             LoopScheme::For(scheme) => {
-                let code = scheme.range.start.generate(ctx)?.flat_map(|start| {
-                    let ty = &start.ty;
+                let code = scheme
+                    .range
+                    .start
+                    .generate(&mut sub_ctx)?
+                    .flat_map(|start| {
+                        let ty = &start.ty;
 
-                    let end = scheme.range.end.generate_with_type_and_check(ty, ctx)?;
-                    let ident = IdentBuilder::variable(&scheme.ident);
+                        let end = scheme
+                            .range
+                            .end
+                            .generate_with_type_and_check(ty, &mut sub_ctx)?;
+                        let ident = IdentBuilder::variable(&scheme.ident);
 
-                    if scheme.reverse() {
-                        Ok(SingleExprValue {
-                            ty: Type::void(),
-                            code: c_code! {
-                                {
-                                    #ty #ident = #end;
-                                    if (#start <= #end) {
-                                        while (1) {
-                                            #stmts
-                                            if (#ident <= #start) {
-                                                break;
+                        sub_ctx.insert(
+                            &scheme.ident,
+                            Value::Variable(VariableValue {
+                                name: c_code! { #ident },
+                                ty: ty.clone(),
+                                perm: Permission::Read,
+                            }),
+                        )?;
+
+                        let stmts = stmts(&mut sub_ctx)?;
+
+                        if scheme.reverse() {
+                            Ok(SingleExprValue {
+                                ty: Type::void(),
+                                perm: Permission::Read,
+                                code: c_code! {
+                                    {
+                                        #ty #ident = #end;
+                                        if (#start <= #end) {
+                                            while (1) {
+                                                #stmts
+                                                if (#ident <= #start) {
+                                                    break;
+                                                }
+                                                #ident -= 1;
                                             }
-                                            #ident -= 1;
                                         }
                                     }
-                                }
-                            },
-                            value: None,
-                        }
-                        .into())
-                    } else {
-                        Ok(SingleExprValue {
-                            ty: Type::void(),
-                            code: c_code! {
-                                {
-                                    #ty #ident = #start;
-                                    if (#start <= #end) {
-                                        while(1) {
-                                            #stmts
-                                            if (#ident >= #end) {
-                                                break;
+                                },
+                                value: None,
+                            }
+                            .into())
+                        } else {
+                            Ok(SingleExprValue {
+                                ty: Type::void(),
+                                perm: Permission::Read,
+                                code: c_code! {
+                                    {
+                                        #ty #ident = #start;
+                                        if (#start <= #end) {
+                                            while(1) {
+                                                #stmts
+                                                if (#ident >= #end) {
+                                                    break;
+                                                }
+                                                #ident += 1;
                                             }
-                                            #ident += 1;
                                         }
                                     }
-                                }
-                            },
-                            value: None,
+                                },
+                                value: None,
+                            }
+                            .into())
                         }
-                        .into())
-                    }
-                })?;
+                    })?;
                 let ExprValue::Distinct(code) = code else {
                     return Err(scheme
                         .range

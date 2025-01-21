@@ -253,11 +253,15 @@ pub fn generate_print(ty: Type, fmt: &'static str, ctx: &mut Context) -> Result<
     )
 }
 
-pub fn generate_custom_print(ty: Type, code: CCode, ctx: &mut Context) -> Result<()> {
-    let print = Ident {
+pub fn print() -> Ident {
+    Ident {
         name: "print".into(),
         span: Span::call_site(),
-    };
+    }
+}
+
+pub fn generate_custom_print(ty: Type, code: CCode, ctx: &mut Context) -> Result<()> {
+    let print = print();
 
     let ident = IdentBuilder::print(&ty);
     ctx.push_function(c_code! {

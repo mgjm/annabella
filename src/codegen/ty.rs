@@ -1,17 +1,33 @@
-use std::{fmt, mem, ptr, rc::Rc};
+use std::{collections::BTreeMap, fmt, mem, ptr, rc::Rc};
 
 use quote::ToTokens;
 
 use crate::{
     codegen::IdentBuilder,
+    parser::SelectorName,
     tokenizer::{Ident, Span, Spanned},
     Result,
 };
 
-use super::{CCode, Context, Value};
+use super::{CCode, Context, ExprValue, Permission, SingleExprValue, Value};
 
 #[derive(Clone)]
 pub struct Type(Rc<Inner>);
+
+enum_dispatch!({
+    #[derive(Debug)]
+    enum Inner {
+        Void(VoidType),
+        Character(CharacterType),
+        Integer(IntegerType),
+        String(StringType),
+        Function(FunctionType),
+        Enum(EnumType),
+        Signed(SignedType),
+        Record(RecordType),
+        Subtype(SubtypeType),
+    }
+});
 
 impl fmt::Debug for Type {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -20,12 +36,14 @@ impl fmt::Debug for Type {
 }
 
 macro_rules! singleton {
-    ($ident:ident, $name:literal) => {{
+    ($ident:ident, $ty:ident $(, $name:literal)?) => {{
         thread_local! {
-            static TYPE: Type = Type::new(Inner::$ident(IdentBuilder::type_(&Ident {
-                name: $name.into(),
-                span: Span::call_site(),
-            })));
+            static TYPE: Type = Type::new(Inner::$ident($ty $({
+                ident: IdentBuilder::type_(&Ident {
+                    name: $name.into(),
+                    span: Span::call_site(),
+                }),
+            })?));
         }
         TYPE.with(Clone::clone)
     }};
@@ -37,7 +55,7 @@ impl Type {
     }
 
     pub fn void() -> Self {
-        singleton!(Void, "void")
+        singleton!(Void, VoidType)
     }
 
     pub fn boolean(ctx: &mut Context<'_>) -> Result<Self> {
@@ -51,15 +69,15 @@ impl Type {
     }
 
     pub fn character() -> Self {
-        singleton!(Character, "character")
+        singleton!(Character, CharacterType, "character")
     }
 
     pub fn integer() -> Self {
-        singleton!(Integer, "integer")
+        singleton!(Integer, IntegerType, "integer")
     }
 
     pub fn string() -> Self {
-        singleton!(String, "string")
+        singleton!(String, StringType, "string")
     }
 
     pub fn function(ty: FunctionType) -> Self {
@@ -72,6 +90,10 @@ impl Type {
 
     pub fn signed(ty: SignedType) -> Self {
         Self::new(Inner::Signed(ty))
+    }
+
+    pub fn record(ty: RecordType) -> Self {
+        Self::new(Inner::Record(ty))
     }
 
     pub fn subtype(ty: SubtypeType) -> Self {
@@ -122,59 +144,31 @@ impl Type {
     }
 
     pub fn to_str(&self) -> &str {
-        match self.inner() {
-            Inner::Void(_) => "void",
-            Inner::Character(_) => "character",
-            Inner::Integer(_) => "integer",
-            Inner::String(_) => "string",
-            Inner::Function(ty) => ty.to_str(),
-            Inner::Enum(ty) => ty.to_str(),
-            Inner::Signed(ty) => ty.to_str(),
-            Inner::Subtype(ty) => ty.to_str(),
-        }
+        Inner!(self.inner(), |value| value.to_str())
     }
 
     /// Is it allowed to assign a `source` value to `self`?
     pub fn can_assign(&self, source: &Self) -> bool {
-        match self.inner() {
-            Inner::Void(_) => matches!(source.inner(), Inner::Void(_)),
-            Inner::Character(_) => matches!(source.inner(), Inner::Character(_)),
-            Inner::Integer(_) => matches!(source.inner(), Inner::Integer(_)),
-            Inner::String(_) => matches!(source.inner(), Inner::String(_)),
-            Inner::Function(ty) => ty.can_assign(source),
-            Inner::Enum(ty) => ty.can_assign(source),
-            Inner::Signed(ty) => ty.can_assign(source),
-            Inner::Subtype(ty) => ty.can_assign(source),
-        }
+        Inner!(self.inner(), |value| value.can_assign(source))
     }
 
     /// Is a constraint check required when assigning a `source` value to `self`?
     pub fn needs_constraint_check(&self, source: &Self) -> Option<&CCode> {
-        match self.inner() {
-            Inner::Void(_) => None,
-            Inner::Character(_) => None,
-            Inner::Integer(_) => None,
-            Inner::String(_) => None,
-            Inner::Function(ty) => ty.needs_constraint_check(source),
-            Inner::Enum(ty) => ty.needs_constraint_check(source),
-            Inner::Signed(ty) => ty.needs_constraint_check(source),
-            Inner::Subtype(ty) => ty.needs_constraint_check(source),
-        }
+        Inner!(self.inner(), |value| value.needs_constraint_check(source))
+    }
+
+    pub(super) fn select(
+        &self,
+        prefix: &SingleExprValue,
+        name: &SelectorName,
+    ) -> Result<ExprValue> {
+        Inner!(self.inner(), |value| value.select(prefix, name))
     }
 }
 
 impl ToTokens for Type {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        match self.inner() {
-            Inner::Void(_) => unimplemented!("void type to tokens"),
-            Inner::Character(ident) => ident.to_tokens(tokens),
-            Inner::Integer(ident) => ident.to_tokens(tokens),
-            Inner::String(ident) => ident.to_tokens(tokens),
-            Inner::Function(_) => todo!("function type to tokens"),
-            Inner::Enum(ty) => ty.ident.to_tokens(tokens),
-            Inner::Signed(ty) => ty.ident.to_tokens(tokens),
-            Inner::Subtype(ty) => ty.last_parent().to_tokens(tokens),
-        }
+        Inner!(self.inner(), |value| value.to_tokens(tokens))
     }
 }
 
@@ -189,18 +183,6 @@ impl<'a> Iterator for Parents<'a> {
     }
 }
 
-#[derive(Debug)]
-pub enum Inner {
-    Void(proc_macro2::Ident),
-    Character(proc_macro2::Ident),
-    Integer(proc_macro2::Ident),
-    String(proc_macro2::Ident),
-    Function(FunctionType),
-    Enum(EnumType),
-    Signed(SignedType),
-    Subtype(SubtypeType),
-}
-
 impl Inner {
     fn parent(&self) -> Option<&Inner> {
         let Self::Subtype(ty) = self else {
@@ -212,8 +194,103 @@ impl Inner {
 
 trait TypeImpl: fmt::Debug {
     fn to_str(&self) -> &str;
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream);
     fn can_assign(&self, source: &Type) -> bool;
     fn needs_constraint_check(&self, source: &Type) -> Option<&CCode>;
+    fn select(&self, prefix: &SingleExprValue, name: &SelectorName) -> Result<ExprValue> {
+        let _ = prefix;
+        Err(name.unrecoverable_error("select not supported on this type"))
+    }
+}
+
+#[derive(Debug)]
+pub struct VoidType;
+
+impl TypeImpl for VoidType {
+    fn to_str(&self) -> &str {
+        "void"
+    }
+
+    fn to_tokens(&self, _tokens: &mut proc_macro2::TokenStream) {
+        unimplemented!("void type to tokens")
+    }
+
+    fn can_assign(&self, source: &Type) -> bool {
+        matches!(source.inner(), Inner::Void(_))
+    }
+
+    fn needs_constraint_check(&self, _source: &Type) -> Option<&CCode> {
+        None
+    }
+}
+
+#[derive(Debug)]
+pub struct CharacterType {
+    ident: proc_macro2::Ident,
+}
+
+impl TypeImpl for CharacterType {
+    fn to_str(&self) -> &str {
+        "character"
+    }
+
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        self.ident.to_tokens(tokens);
+    }
+
+    fn can_assign(&self, source: &Type) -> bool {
+        matches!(source.inner(), Inner::Character(_))
+    }
+
+    fn needs_constraint_check(&self, _source: &Type) -> Option<&CCode> {
+        None
+    }
+}
+
+#[derive(Debug)]
+pub struct IntegerType {
+    ident: proc_macro2::Ident,
+}
+
+impl TypeImpl for IntegerType {
+    fn to_str(&self) -> &str {
+        "integer"
+    }
+
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        self.ident.to_tokens(tokens);
+    }
+
+    fn can_assign(&self, source: &Type) -> bool {
+        matches!(source.inner(), Inner::Integer(_))
+    }
+
+    fn needs_constraint_check(&self, _source: &Type) -> Option<&CCode> {
+        None
+    }
+}
+
+#[derive(Debug)]
+pub struct StringType {
+    ident: proc_macro2::Ident,
+}
+
+impl TypeImpl for StringType {
+    fn to_str(&self) -> &str {
+        "string"
+    }
+
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        self.ident.to_tokens(tokens);
+    }
+
+    fn can_assign(&self, source: &Type) -> bool {
+        matches!(source.inner(), Inner::String(_))
+    }
+
+    fn needs_constraint_check(&self, _source: &Type) -> Option<&CCode> {
+        None
+    }
 }
 
 #[derive(Debug)]
@@ -225,6 +302,10 @@ pub struct FunctionType {
 impl TypeImpl for FunctionType {
     fn to_str(&self) -> &str {
         "Function"
+    }
+
+    fn to_tokens(&self, _tokens: &mut proc_macro2::TokenStream) {
+        todo!("function type to tokens")
     }
 
     fn can_assign(&self, source: &Type) -> bool {
@@ -252,16 +333,15 @@ impl TypeImpl for EnumType {
         &self.name.name
     }
 
-    fn can_assign(&self, mut source: &Type) -> bool {
-        let source = loop {
-            source = match source.inner() {
-                Inner::Subtype(ty) => &ty.parent,
-                Inner::Enum(ty) => break ty,
-                _ => return false,
-            };
-        };
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        self.ident.to_tokens(tokens);
+    }
 
-        ptr::eq(self, source)
+    fn can_assign(&self, source: &Type) -> bool {
+        match source.last_parent_inner() {
+            Inner::Enum(source) => ptr::eq(self, source),
+            _ => false,
+        }
     }
 
     fn needs_constraint_check(&self, _target: &Type) -> Option<&CCode> {
@@ -281,17 +361,16 @@ impl TypeImpl for SignedType {
         &self.name.name
     }
 
-    fn can_assign(&self, mut source: &Type) -> bool {
-        let source = loop {
-            source = match source.inner() {
-                Inner::Integer(_) => return true,
-                Inner::Subtype(ty) => &ty.parent,
-                Inner::Signed(ty) => break ty,
-                _ => return false,
-            };
-        };
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        self.ident.to_tokens(tokens);
+    }
 
-        ptr::eq(self, source)
+    fn can_assign(&self, source: &Type) -> bool {
+        match source.last_parent_inner() {
+            Inner::Integer(_) => true,
+            Inner::Signed(source) => ptr::eq(self, source),
+            _ => false,
+        }
     }
 
     fn needs_constraint_check(&self, source: &Type) -> Option<&CCode> {
@@ -302,6 +381,57 @@ impl TypeImpl for SignedType {
         }
         self.constraint_check.as_ref()
     }
+}
+
+#[derive(Debug)]
+pub struct RecordType {
+    pub name: Ident,
+    pub ident: proc_macro2::Ident,
+    pub fields: BTreeMap<Box<str>, RecordField>,
+}
+
+impl TypeImpl for RecordType {
+    fn to_str(&self) -> &str {
+        &self.name.name
+    }
+
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        self.ident.to_tokens(tokens);
+    }
+
+    fn can_assign(&self, source: &Type) -> bool {
+        match source.last_parent_inner() {
+            Inner::Record(source) => ptr::eq(self, source),
+            _ => false,
+        }
+    }
+
+    fn needs_constraint_check(&self, _source: &Type) -> Option<&CCode> {
+        None
+    }
+
+    fn select(&self, prefix: &SingleExprValue, name: &SelectorName) -> Result<ExprValue> {
+        let Some(field) = self.fields.get(match name {
+            SelectorName::Ident(ident) => &ident.name,
+        }) else {
+            return Err(name.unrecoverable_error("unknown field name"));
+        };
+
+        let ident = &field.ident;
+        Ok(SingleExprValue {
+            ty: field.ty.clone(),
+            perm: prefix.perm,
+            code: c_code! { #prefix.#ident },
+            value: None,
+        }
+        .into())
+    }
+}
+
+#[derive(Debug)]
+pub struct RecordField {
+    pub ident: proc_macro2::Ident,
+    pub ty: Type,
 }
 
 #[derive(Debug)]
@@ -319,6 +449,10 @@ impl SubtypeType {
 impl TypeImpl for SubtypeType {
     fn to_str(&self) -> &str {
         self.last_parent().to_str()
+    }
+
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        self.last_parent().to_tokens(tokens);
     }
 
     fn can_assign(&self, source: &Type) -> bool {

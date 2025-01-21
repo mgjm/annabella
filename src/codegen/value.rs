@@ -5,7 +5,7 @@ use crate::{
     Result,
 };
 
-use super::{CCode, ExprValue, SingleExprValue, Type};
+use super::{CCode, ExprValue, Permission, SingleExprValue, Type};
 
 #[derive(Debug, Default)]
 pub struct Scope<'a> {
@@ -94,6 +94,7 @@ impl FunctionValue {
     pub(super) fn expr_value(&self) -> ExprValue {
         ExprValue::new(self.overloads.iter().map(|ol| SingleExprValue {
             ty: ol.ty.clone(),
+            perm: Permission::Read,
             code: ol.name.clone(),
             value: None,
         }))
@@ -116,12 +117,14 @@ pub struct TypeValue {
 pub struct VariableValue {
     pub name: CCode,
     pub ty: Type,
+    pub perm: Permission,
 }
 
 impl VariableValue {
     pub(super) fn expr_value(&self) -> ExprValue {
         SingleExprValue {
             ty: self.ty.clone(),
+            perm: self.perm,
             code: self.name.clone(),
             value: None,
         }

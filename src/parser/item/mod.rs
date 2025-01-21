@@ -3,7 +3,7 @@ use crate::{
     Result, Token,
 };
 
-use super::{Expr, Parenthesized, Parse, ParseStream, Stmt};
+use super::{DiscreteChoice, Expr, Parenthesized, Parse, ParseStream, Punctuated, Stmt};
 
 parse!({
     enum Item {
@@ -168,6 +168,7 @@ parse!({
         Enum(EnumTypeDefinition),
         Signed(SignedTypeDefinition),
         Modular(ModularTypeDefinition),
+        Record(RecordTypeDefinition),
     }
 });
 
@@ -177,6 +178,8 @@ impl Parse for TypeDefinition {
             Self::Signed(td)
         } else if let Some(td) = input.try_parse()? {
             Self::Modular(td)
+        } else if let Some(td) = input.try_parse()? {
+            Self::Record(td)
         } else if let Some(td) = input.try_parse()? {
             Self::Enum(td)
         } else {
@@ -232,6 +235,118 @@ impl Parse for ModularTypeDefinition {
             Ok(Self {
                 mod_,
                 modulus: input.parse()?,
+            })
+        })
+    }
+}
+
+parse!({
+    struct RecordTypeDefinition {
+        record: Token![record],
+        components: RecordComponentList,
+        end: Token![end],
+    }
+});
+
+impl Parse for RecordTypeDefinition {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let record = input.parse()?;
+        input.unrecoverable(|input| {
+            let components = input.parse()?;
+            let end = input.parse()?;
+            let _: Token![record] = input.parse()?;
+            Ok(Self {
+                record,
+                components,
+                end,
+            })
+        })
+    }
+}
+
+parse!({
+    struct RecordComponentList {
+        components: Vec<Variable>,
+        variant: Option<RecordVariant>,
+        null: Option<Token![null]>,
+    }
+});
+
+impl Parse for RecordComponentList {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let null = input.try_parse()?;
+        let mut components = Vec::new();
+        let variant = if null.is_some() {
+            None
+        } else {
+            while let Some(component) = input.try_parse()? {
+                components.push(component);
+            }
+
+            if components.is_empty() {
+                Some(input.parse()?)
+            } else {
+                input.try_parse()?
+            }
+        };
+        Ok(Self {
+            components,
+            variant,
+            null,
+        })
+    }
+}
+
+parse!({
+    struct RecordVariant {
+        case: Token![case],
+        expr: Expr,
+        is_: Token![is],
+        alternatives: Vec<RecordVariantAlternative>,
+        end: Token![end],
+        semi: Token![;],
+    }
+});
+
+impl Parse for RecordVariant {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let case = input.parse()?;
+        input.unrecoverable(|input| {
+            let expr = input.parse()?;
+            let is_ = input.parse()?;
+            let (alternatives, end) = input.parse_until_end()?;
+            let _: Token![case] = input.parse()?;
+            let semi = input.parse()?;
+            Ok(Self {
+                case,
+                expr,
+                is_,
+                alternatives,
+                end,
+                semi,
+            })
+        })
+    }
+}
+
+parse!({
+    struct RecordVariantAlternative {
+        when: Token![when],
+        choices: Punctuated<DiscreteChoice, Token![|]>,
+        arrow: Token![=>],
+        components: RecordComponentList,
+    }
+});
+
+impl Parse for RecordVariantAlternative {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let when = input.parse()?;
+        input.unrecoverable(|input| {
+            Ok(Self {
+                when,
+                choices: input.call(Punctuated::parse_while)?,
+                arrow: input.parse()?,
+                components: input.parse()?,
             })
         })
     }

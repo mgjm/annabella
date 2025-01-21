@@ -1,209 +1,39 @@
 -- This is just a test
 
-procedure FooBar is
+type Month_Name is (Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec);
+
+subtype Day is Integer range 1 .. 31;
+subtype Year is Integer range 0 .. 4000;
+
+type Date is
+   record
+      Day : Day;
+      Month : Month_Name;
+      Year : Year;
+   end record;
+
+function Next(d: Date) return Date is
+   r: Date;
 begin
-   Print("Foo Bar");
+   r := d;
+   r.Day := r.Day + 1;
+   return r;
 end;
-
-procedure Test is
-begin
-   Print("Inside Test procedure");
-end;
-
-function Test return Integer is
-begin
-   Print("Inside Test int function");
-   return 9000;
-end;
-
-function Test return String is
-begin
-   Print("Inside Test str function");
-   return "Test overload";
-end;
-
-procedure Test (foo: Integer; bar: String) is
-begin
-   Print("Test2:");
-   Print(foo);
-   Print(bar);
-   Print("end Test2");
-end;
-
-
-function ReturnCheck return Integer is
-begin
-   return Test;
-end;
-
--- procedure Test (foo: String) is
--- begin
---    "Test";
---    foo;
--- end Test;
-
-type Meter is range 0 .. 1_000_000;
-type Inch is range 0 .. 123;
-type Byte is mod 256;
-type Minute is mod 60;
-
--- function "+"(lhs: Meter; rhs: Meter) return Meter is
--- begin
---    return lhs - rhs;
--- end;
-
--- function "+"(lhs: Meter; rhs: Inch) return Meter is
--- begin
---    return lhs + Meter(rhs) / 39;
--- end;
-
--- procedure Main is
---    m: Meter;
---    i: Inch;
---    d: Day;
---    wd: Weekday;
--- begin
---    m := 123;
---    i := 42;
---    m := "+"(m, i);
---    -- m := m + Inch'(1_000_000);
---    -- i := 1000;
---    -- i := Inch(Meter(i));
---    -- i := i + m;
---    Put_Line(m'Image);
---    Put_Line(i'Image);
---    d := Day'Pred(Wtf);
-
-type Day is (Mon, Tue, Wed, Thu, Fri, Sat, Sun);
-type Weekend is (Sat, Sun);
-subtype Weekday is Day range Mon .. Fri;
 
 procedure Main is
-   d: Day;
-   wd: Weekday;
-   m: Meter;
-   i: Inch;
-   min: Minute;
-   b: Boolean;
-   U: Integer;
-   V: Integer;
+   d : Date;
 begin
    Print("Start");
-   Print("Hello \n World""");
-   Print('x');
-   d := Sat;
+
+   d.Day := 21;
+   d.Month := Jan;
+   d.Year := 2025;
    Print(d);
-   wd := Thu;
-   Print(wd);
-   d := wd;
-   Print(d);
-   wd := d;
-   Print(wd);
-   Test;
-   FooBar;
-   Test(Test, Test);
-   -- Print(1 + 2 * 5 / 2 > 1 or 5 > 2);
-   Print(ReturnCheck);
 
-   m := 5;
-   m := m + 3;
-   Print(m);
-
-   i := 3;
-   i := i + 120;
-   Print(i);
-
-   Print(Inch'(123));
-   Print(Meter'(123));
-   Print(Integer'(123));
-   Print(Day'(Sat));
-   Print(Weekend'(Sat));
-   -- Print(Weekday'(Sat)); --> Constraint_Error
-
-
-   min := 5;
-   Print(min + 5 / 3 * 59);
-
-   b := false;
-   Print(b);
-
-   b := true;
-   Print(b);
-
-   b := i < 5;
-   Print(b);
-
-   b := b < false;
-   Print(b);
-
-   Print("Start of if:");
-   if i < 3 then
-      Print("if");
-   elsif true or else Test > 5 then
-      Print("elif");
-   elsif true then
-      Print("elif2");
-   else
-      Print("else");
-   end if;
-
-Swap:
-   declare
-      Temp : Integer;
-   begin
-      Temp := V;
-      V := U;
-      U := Temp;
-   end Swap;
-
-   declare
-      Temp : Integer;
-   begin
-      Temp := V;
-      V := U;
-      U := Temp;
-   end;
-
-   i := 5;
-<<label>>
-   Print(i);
-   i := i - 1;
-   if i <= 0 then
-      goto end_label;
-   end if;
-   goto label;
-<<end_label>>
-
-   i := 5;
-   loop
-      Print(i);
-      i := i - 1;
-      exit when i <= 0;
-   end loop;
-
-   i := 5;
-   while i > 0 loop
-      Print(i);
-      i := i - 1;
-   end loop;
-
-   for i in 0 .. 5 loop
-      Print(i);
-   end loop;
-
-   for i in reverse 0 .. 5 loop
-      Print(i);
-   end loop;
-
-
-   for d in Mon .. Sun loop
+   for i in 1 .. 10 loop
+      d := Next(d);
       Print(d);
-      case d is
-         when Mon => Print("start of week");
-         when Fri => Print("ready for weekend");
-         when Tue .. Thu => Print("work time");
-         when others => Print("free time");
-      end case;
+      Print(i);
    end loop;
 
    Print("End");

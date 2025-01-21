@@ -2,13 +2,15 @@ use crate::{
     parser::{
         BaseName, BinaryOp, Expr, ExprBinary, ExprLit, ExprShortCircuit, FunctionCall, LitChar,
         LitNumber, LitStr, Name, QualifiedExpr, QualifiedExprValue, QualifiedExprValueExpr,
-        ShortCircuitOp,
+        SelectedComponent, ShortCircuitOp,
     },
     tokenizer::{Ident, Span, Spanned},
     Result,
 };
 
-use super::{CCode, CodeGenExpr, CompileTimeValue, Context, ExprValue, SingleExprValue, Type};
+use super::{
+    CCode, CodeGenExpr, CompileTimeValue, Context, ExprValue, Permission, SingleExprValue, Type,
+};
 
 impl CodeGenExpr for Expr {
     #[expect(unused_variables)]
@@ -39,6 +41,7 @@ impl CodeGenExpr for LitStr {
         let str = self.str();
         Ok(SingleExprValue {
             ty: Type::string(),
+            perm: Permission::Read,
             code: c_code! { #str },
             value: Some(CompileTimeValue::String(str)),
         }
@@ -51,6 +54,7 @@ impl CodeGenExpr for LitChar {
         let char = self.char();
         Ok(SingleExprValue {
             ty: Type::character(),
+            perm: Permission::Read,
             code: c_code! { #char },
             value: Some(CompileTimeValue::Character(char)),
         }
@@ -63,6 +67,7 @@ impl CodeGenExpr for LitNumber {
         let num = self.number();
         Ok(SingleExprValue {
             ty: Type::integer(),
+            perm: Permission::Read,
             code: c_code! { #num },
             value: Some(CompileTimeValue::Integer(num)),
         }
@@ -74,6 +79,7 @@ impl CodeGenExpr for Name {
     fn generate(&self, ctx: &mut Context) -> Result<ExprValue> {
         match self {
             Self::Base(name) => name.generate(ctx),
+            Self::Select(name) => name.generate(ctx),
             Self::FunctionCall(name) => name.generate(ctx),
         }
     }
@@ -81,6 +87,7 @@ impl CodeGenExpr for Name {
     fn generate_type(&self, ctx: &mut Context) -> Result<Type> {
         match self {
             Self::Base(name) => name.generate_type(ctx),
+            Self::Select(name) => name.generate_type(ctx),
             Self::FunctionCall(name) => name.generate_type(ctx),
         }
     }
@@ -106,6 +113,7 @@ impl CodeGenExpr for QualifiedExpr {
         let code = self.value.generate_with_type_and_check(&ty, ctx)?;
         Ok(SingleExprValue {
             ty,
+            perm: Permission::Read,
             code,
             value: None,
         }
@@ -127,9 +135,22 @@ impl CodeGenExpr for QualifiedExprValueExpr {
     }
 }
 
-fn generate_function_call<'a, A>(name: &Name, args: A, ctx: &mut Context) -> Result<ExprValue>
+impl CodeGenExpr for SelectedComponent {
+    fn generate(&self, ctx: &mut Context) -> Result<ExprValue> {
+        self.prefix
+            .generate(ctx)?
+            .flat_map(|prefix| prefix.ty.select(&prefix, &self.name))
+    }
+}
+
+pub(super) fn generate_function_call<'a, A, E>(
+    name: &Name,
+    args: A,
+    ctx: &mut Context,
+) -> Result<ExprValue>
 where
-    A: ExactSizeIterator<Item = &'a Expr> + Clone,
+    A: ExactSizeIterator<Item = &'a E> + Clone,
+    E: CodeGenExpr + 'static,
 {
     let f = name.generate(ctx)?;
     f.flat_map(|f| {
@@ -161,6 +182,7 @@ where
         };
         Ok(SingleExprValue {
             ty: ty.return_type.clone(),
+            perm: Permission::Read,
             code: c_code! {
                 #f(#(#args),*)
             },
@@ -223,6 +245,7 @@ impl CodeGenExpr for ExprShortCircuit {
 
         Ok(SingleExprValue {
             ty: boolean,
+            perm: Permission::Read,
             code: c_code! { #lhs #op #rhs },
             value: None,
         }
@@ -236,6 +259,7 @@ impl ExprValue {
             Ok(match value.ty.as_function() {
                 Some(f) if f.args.is_empty() => SingleExprValue {
                     ty: f.return_type.clone(),
+                    perm: Permission::Read,
                     code: c_code! { #value() },
                     value: None,
                 }

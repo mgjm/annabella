@@ -99,7 +99,11 @@ impl IdentBuilder {
         Self::start("label").ident(label).build()
     }
 
-    pub(crate) fn variable(name: &Ident) -> CIdent {
+    pub fn variable(name: &Ident) -> CIdent {
         Self::start("variable").ident(name).build()
+    }
+
+    pub fn field(name: &Ident) -> CIdent {
+        Self::start("field").ident(name).build()
     }
 }
