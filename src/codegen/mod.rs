@@ -117,7 +117,7 @@ impl ExprValue {
                 Self::new(new_values).ok_or_else(|| last_err.unwrap())
             }
             Self::Dynamic(values) => {
-                return Err(values.unrecoverable_error("dynamic expression type not allowed"))
+                Err(values.unrecoverable_error("dynamic expression type not allowed"))
             }
         }
     }
@@ -194,6 +194,8 @@ impl From<DynamicExprValue> for ExprValue {
 #[derive(Clone)]
 struct DynamicExprValue {
     span: Span,
+
+    #[expect(clippy::type_complexity)]
     generate: Rc<dyn Fn(&Type) -> Result<ExprValue>>,
 }
 

@@ -225,6 +225,7 @@ impl ParseBuffer<'_> {
         result
     }
 
+    #[expect(dead_code)]
     fn parse_all<T>(&mut self) -> Result<Vec<T>>
     where
         T: Parse,

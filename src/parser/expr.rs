@@ -136,7 +136,7 @@ impl Expr {
     }
 
     pub(super) fn parse_simple_expression(input: ParseStream) -> Result<Self> {
-        #[allow(clippy::manual_map)]
+        #[expect(clippy::manual_map)]
         let op = if let Some(op) = input.try_parse()? {
             Some(UnaryOp::Add(op))
         } else if let Some(op) = input.try_parse()? {
