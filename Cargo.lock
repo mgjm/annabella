@@ -3,7 +3,7 @@
 version = 4
 
 [[package]]
-name = "annabella-rs"
+name = "annabella"
 version = "0.1.0"
 dependencies = [
  "anyhow",

@@ -1,6 +1,6 @@
 use std::{env, fs, path::PathBuf};
 
-use annabella_rs::{codegen, parser, tokenizer::TokenStream, Error};
+use annabella::{codegen, parser, tokenizer::TokenStream, Error};
 use anyhow::{Context, Result};
 
 fn main() -> Result<()> {

@@ -1,7 +1,10 @@
 [package]
-name = "annabella-rs"
+name = "annabella"
 version = "0.1.0"
+authors = ["Martin Michaelis <code@mgjm.de>"]
 edition = "2021"
+repository = "https://github.com/mgjm/annabella"
+license = "GPL-3.0-or-later"
 
 [features]
 default = ["span-locations"]
