@@ -1,5 +1,9 @@
 # Annabella
 
+> [!NOTE]
+> This is the first experimental version of annabella in C.
+> I abandoned this path and instead continued to develop an approach written in Rust (main branch).
+
 Run Ada code without an existing Ada compiler binary.
 
 The GNAT Ada compiler is written in Ada. You need an existing Ada compiler executable to compile the Ada compiler.
